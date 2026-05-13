@@ -8,24 +8,19 @@ def home(request):
 
     features = [
         {
-            "icon": svg("M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"),
-            "title": "Tudo em um lugar",
-            "description": "Corrente, poupança, cartão, investimentos. Adicione quantas contas quiser e veja tudo de uma vez.",
-        },
-        {
             "icon": svg("M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"),
-            "title": "Gastos com clareza",
-            "description": "Você para de perguntar 'onde foi parar?' e começa a saber. Categorias automáticas, alertas de limite e resumo mensal.",
+            "title": "Análise Inteligente",
+            "description": "O Solve lê seus extratos, categoriza automaticamente e entrega um panorama completo da sua vida financeira — sem você mover um dedo.",
         },
         {
-            "icon": svg("M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"),
-            "title": "Portfólio unificado",
-            "description": "Ações, FIIs, renda fixa e poupança no mesmo painel. Você vê seu patrimônio e entende como ele evolui.",
+            "icon": svg("M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"),
+            "title": "Orientação Contextual",
+            "description": "Mais que dados: o Solve entende seu momento financeiro e entrega orientação relevante na hora certa. Você sabe o que fazer, não só o que aconteceu.",
         },
         {
-            "icon": svg("M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"),
-            "title": "Metas que acontecem",
-            "description": "Defina um objetivo — viagem, reserva, aposentadoria. O Solve acompanha o progresso e avisa quando algo muda.",
+            "icon": svg("M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"),
+            "title": "Sem Julgamento",
+            "description": "Sem alertas agressivos, sem culpa. O Solve mostra sua realidade financeira com clareza para que você tome decisões — não se sinta mal.",
         },
     ]
 
@@ -37,7 +32,7 @@ def home(request):
 
     steps = [
         {"title": "Crie sua conta", "description": "Menos de 2 minutos. Só precisa do seu e-mail."},
-        {"title": "Adicione suas contas", "description": "Importe seu extrato ou lance as transações. O Solve organiza tudo."},
+        {"title": "Adicione suas contas", "description": "Importe seu extrato. O Solve lê, categoriza e organiza tudo automaticamente."},
         {"title": "Agora você sabe.", "description": "Veja para onde vai cada real. Entenda seus padrões. Tome decisões com clareza."},
     ]
 
@@ -85,24 +80,40 @@ def pricing(request):
             "name": "Grátis",
             "price": "R$0",
             "period": "para sempre",
-            "description": "Para quem quer começar a se organizar.",
+            "description": "Para começar a se organizar.",
             "features": ["Até 2 contas", "Controle de gastos básico", "Resumo mensal"],
             "cta": "Começar grátis",
             "href": "/accounts/register/",
             "highlight": False,
         },
         {
-            "name": "Pro",
-            "price": "R$25",
+            "name": "Essencial",
+            "price": "R$19,90",
             "period": "por mês",
-            "description": "Para quem leva finanças a sério.",
+            "description": "Para quem quer visibilidade real das finanças.",
             "features": [
                 "Contas ilimitadas",
                 "Importação ilimitada de extratos",
+                "Categorização automática inteligente",
+                "Relatórios mensais completos",
+                "Alertas de limite e vencimento",
+            ],
+            "cta": "Assinar Essencial",
+            "href": "/accounts/register/?plan=essencial",
+            "highlight": False,
+        },
+        {
+            "name": "Pro",
+            "price": "R$34,90",
+            "period": "por mês",
+            "description": "Para quem quer controle total e orientação personalizada.",
+            "features": [
+                "Tudo do Essencial",
                 "Portfólio de investimentos",
                 "Metas financeiras",
+                "Orientação personalizada",
                 "Relatórios avançados",
-                "Categorização automática inteligente",
+                "Suporte prioritário",
             ],
             "cta": "Assinar Pro",
             "href": "/accounts/register/?plan=pro",
@@ -112,7 +123,7 @@ def pricing(request):
     faqs = [
         {"question": "Preciso de cartão de crédito para criar minha conta?", "answer": "Não. O plano Grátis não exige nenhuma forma de pagamento. Você só precisa de um cartão caso queira fazer upgrade para o plano Pro."},
         {"question": "Posso cancelar a qualquer momento?", "answer": "Sim, sem fidelidade e sem multa. Basta acessar as configurações da conta e cancelar com um clique. Seus dados ficam disponíveis por 30 dias após o cancelamento."},
-        {"question": "Como adiciono minhas contas e extratos?", "answer": "Você importa o extrato do seu banco em formato CSV ou OFX, ou lança as transações manualmente. O Solve categoriza tudo automaticamente — você só precisa conferir."},
+        {"question": "Como adiciono minhas contas e extratos?", "answer": "Você importa o extrato do seu banco em formato CSV ou OFX. O Solve lê, categoriza e organiza tudo automaticamente — você só precisa conferir."},
         {"question": "Meus dados financeiros estão seguros?", "answer": "Sim. Todos os dados são criptografados com AES-256 em trânsito e em repouso, seguindo os mesmos padrões de grandes bancos e em conformidade com a LGPD."},
         {"question": "O que acontece se eu ultrapassar o limite do plano Grátis?", "answer": "Você receberá um aviso e poderá fazer upgrade para o Pro. Nunca bloqueamos seu acesso ou cobraremos sem aviso prévio."},
     ]
