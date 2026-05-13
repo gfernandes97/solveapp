@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="flex min-h-full flex-col items-center justify-center bg-slate-50 px-4">
+  <a href="{% url 'home' %}" class="mb-8 flex items-center gap-2.5">
+    <svg class="h-9 w-9 text-solve" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M20.5 8.9A9 9 0 1 1 15.8 3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="8" y1="16" x2="20.2" y2="3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <polyline points="17.8,4.5 20.2,3.8 19.6,6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+    <span class="text-xl font-black tracking-tight text-obsidian">solve</span>
+  </a>
+  {% block content %}{% endblock %}
+</div>
+{% endblock %}

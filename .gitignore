@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Django
+*.sqlite3
+/frontend/staticfiles/
+/frontend/media/
+/frontend/static/CACHE/
+
+# Environment
+.env
+.env.*
+!.env.example
+venv/
+env/
+.venv/
+ENV/
+
+# OS
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# Node (caso seja adicionado)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Logs
+*.log
+logs/
+
+# Docker volumes
+.docker/
+
+# Batch/temp
+frontend/start_server.bat
+
+# Office temp files
+docs/presentations/~$*
+
+# Claude local settings
+.claude/settings.local.json

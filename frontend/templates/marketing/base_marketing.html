@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  body { font-family: 'Inter', sans-serif; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="flex min-h-full flex-col">
+
+  <!-- Navbar -->
+  <header id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300">
+    <nav class="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+
+      <a href="{% url 'home' %}" class="flex items-center gap-2.5 flex-shrink-0">
+        <svg id="nav-logo-icon" class="h-9 w-9" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="color:white">
+          <path d="M20.5 8.9A9 9 0 1 1 15.8 3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="8" y1="16" x2="20.2" y2="3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <polyline points="17.8,4.5 20.2,3.8 19.6,6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span id="nav-logo-text" class="text-xl font-black tracking-tight" style="color:white">solve</span>
+      </a>
+
+      <div class="hidden items-center gap-8 md:flex">
+        <a href="{% url 'home' %}#como-funciona" class="nav-link text-sm font-medium text-white/70 hover:text-white transition-colors duration-200">Como funciona</a>
+        <a href="{% url 'pricing' %}" class="nav-link text-sm font-medium text-white/70 hover:text-white transition-colors duration-200">Planos</a>
+        <a href="{% url 'login' %}" class="nav-link text-sm font-medium text-white/70 hover:text-white transition-colors duration-200">Entrar</a>
+        <a href="{% url 'register' %}" class="rounded-full bg-solve px-5 py-2 text-sm font-semibold text-obsidian transition-colors duration-200 hover:bg-solve-light">
+          Começar grátis
+        </a>
+      </div>
+
+      <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="md:hidden p-2 text-white">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </nav>
+
+    <div id="mobile-menu" class="hidden border-t border-white/10 bg-obsidian px-6 py-4 md:hidden">
+      <div class="flex flex-col gap-4">
+        <a href="{% url 'pricing' %}" class="text-sm text-white/70">Planos</a>
+        <a href="{% url 'login' %}" class="text-sm text-white/70">Entrar</a>
+        <a href="{% url 'register' %}" class="rounded-full bg-solve px-5 py-2 text-center text-sm font-semibold text-obsidian">Começar grátis</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-obsidian text-smoke">
+    <div class="mx-auto max-w-7xl px-6 pt-16 pb-8">
+
+      <div class="grid gap-10 border-b border-white/10 pb-12 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <svg class="h-8 w-8 text-white" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M20.5 8.9A9 9 0 1 1 15.8 3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="8" y1="16" x2="20.2" y2="3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <polyline points="17.8,4.5 20.2,3.8 19.6,6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+            <span class="text-xl font-black tracking-tight text-white">solve</span>
+          </div>
+          <p class="mt-2 text-xs font-semibold uppercase tracking-widest text-solve">Agora você sabe.</p>
+          <p class="mt-3 text-sm leading-relaxed">Centralize sua vida financeira. Gastos, investimentos e metas em um só lugar.</p>
+          <div class="mt-4">
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs text-smoke">
+              <svg class="h-2.5 w-2.5 text-solve" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+              Todos os sistemas operacionais
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <p class="text-sm font-semibold text-white">Produto</p>
+          <ul class="mt-4 space-y-2 text-sm">
+            <li><a href="{% url 'home' %}#como-funciona" class="hover:text-white transition-colors">Como funciona</a></li>
+            <li><a href="{% url 'pricing' %}" class="hover:text-white transition-colors">Planos e preços</a></li>
+            <li><a href="{% url 'home' %}#funcionalidades" class="hover:text-white transition-colors">Funcionalidades</a></li>
+            <li><a href="{% url 'home' %}#seguranca" class="hover:text-white transition-colors">Segurança</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-sm font-semibold text-white">Suporte</p>
+          <ul class="mt-4 space-y-2 text-sm">
+            <li><a href="#" class="hover:text-white transition-colors">Central de ajuda</a></li>
+            <li><a href="#" class="hover:text-white transition-colors">Relatar fraude</a></li>
+            <li><a href="#" class="hover:text-white transition-colors">Ouvidoria</a></li>
+            <li><a href="#" class="hover:text-white transition-colors">Acessibilidade</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-sm font-semibold text-white">Conformidade</p>
+          <ul class="mt-4 space-y-2 text-sm">
+            <li><a href="#" class="hover:text-white transition-colors">Política de privacidade</a></li>
+            <li><a href="#" class="hover:text-white transition-colors">Termos de uso</a></li>
+            <li><a href="#" class="hover:text-white transition-colors">LGPD</a></li>
+            <li><a href="#" class="hover:text-white transition-colors">Relatório de segurança</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="mt-8 flex flex-col items-start gap-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+        <p>© 2026 Solve. Todos os direitos reservados. CNPJ 00.000.000/0001-00</p>
+        <div class="flex flex-wrap gap-4 text-white/20">
+          <span>Regulado pelo Banco Central do Brasil</span>
+          <span>·</span>
+          <span>Criptografia AES-256</span>
+          <span>·</span>
+          <span>Dados protegidos pela LGPD</span>
+        </div>
+      </div>
+
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  const navbar   = document.getElementById('navbar');
+  const logoIcon = document.getElementById('nav-logo-icon');
+  const logoText = document.getElementById('nav-logo-text');
+  const links    = navbar.querySelectorAll('.nav-link');
+
+  function updateNav() {
+    const atTop = window.scrollY < 60;
+    if (atTop) {
+      navbar.style.cssText = 'background: transparent';
+      logoIcon.style.color = 'white';
+      logoText.style.color = 'white';
+      links.forEach(l => { l.classList.remove('text-slate-600','hover:text-slate-900'); l.classList.add('text-white/70','hover:text-white'); });
+    } else {
+      navbar.style.cssText = 'background: rgba(255,255,255,0.96); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0';
+      logoIcon.style.color = '#00C97A';
+      logoText.style.color = '#0F172A';
+      links.forEach(l => { l.classList.remove('text-white/70','hover:text-white'); l.classList.add('text-slate-600','hover:text-slate-900'); });
+    }
+  }
+  window.addEventListener('scroll', updateNav);
+  updateNav();
+</script>
+{% endblock %}

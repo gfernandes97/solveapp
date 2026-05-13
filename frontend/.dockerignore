@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.sqlite3
+staticfiles/
+media/
+.env
+venv/
+env/
+.venv/
+*.log
+start_server.bat
