@@ -3,6 +3,19 @@
 
 ---
 
+## Modelo de Ingestão de Dados
+
+O Solve opera com **upload on demand**: o usuário importa extratos e faturas manualmente, sem integração automática com bancos. Isso redefine o modelo de triggers:
+
+| Fase | Trigger | Propósito |
+|------|---------|-----------|
+| **Antes do upload** | Lembrete baseado em calendário / tempo decorrido / proximidade de fechamento | Trazer o usuário ao app para importar |
+| **Depois do upload** | Análise imediata (< 3 segundos) com insight, anomalia ou progresso | Recompensar o esforço com valor instantâneo |
+
+> O upload é o evento central do loop. Tudo antes traz o usuário; tudo depois o recompensa.
+
+---
+
 ## O Problema de Retenção em Fintech
 
 Apps de finanças pessoais têm um dos piores índices de retenção do mercado:

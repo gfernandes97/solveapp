@@ -1,8 +1,12 @@
 from django.urls import path
-from . import views
 
+from allauth.account.views import LoginView, LogoutView, SignupView
+
+# Aliases de URL para manter compatibilidade com os templates existentes.
+# 'login', 'register', 'logout' são usados em todo o projeto;
+# allauth usa 'account_login', 'account_signup', 'account_logout'.
 urlpatterns = [
-    path("login/", views.login_view, name="login"),
-    path("register/", views.register_view, name="register"),
-    path("logout/", views.logout_view, name="logout"),
+    path("login/", LoginView.as_view(), name="login"),
+    path("register/", SignupView.as_view(), name="register"),
+    path("logout/", LogoutView.as_view(), name="logout"),
 ]

@@ -100,7 +100,7 @@ def pricing(request):
             ],
             "cta": "Assinar Essencial",
             "href": "/accounts/register/?plan=essencial",
-            "highlight": False,
+            "highlight": True,
         },
         {
             "name": "Pro",
@@ -117,7 +117,7 @@ def pricing(request):
             ],
             "cta": "Assinar Pro",
             "href": "/accounts/register/?plan=pro",
-            "highlight": True,
+            "highlight": False,
         },
     ]
     faqs = [

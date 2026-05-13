@@ -2,3 +2,16 @@ django==5.2
 django-crispy-forms==2.6
 crispy-tailwind==1.0.3
 whitenoise==6.12.0
+
+# Auth — Google OAuth + email/password
+django-allauth[google]==65.3.0
+
+# Environment variables — SQLite local → PostgreSQL production
+django-environ==0.11.2
+
+# PostgreSQL driver (used in production; ignored locally with SQLite)
+psycopg2-binary==2.9.10
+
+# Required by allauth Google OAuth2 provider
+PyJWT>=2.0
+cryptography>=40.0

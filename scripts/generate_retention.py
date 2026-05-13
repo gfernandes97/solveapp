@@ -27,43 +27,47 @@ C_D20 = RGBColor(0x1E, 0x29, 0x3B)
 LOOPS = [
     {
         "num": "01", "name": "Alerta Contextual",
-        "freq": "Múltiplas vezes por semana",
+        "freq": "Toda vez que há upload + lembretes preventivos",
         "color": C_RED,
-        "trigger":     "Gasto incomum detectado\nou fatura próxima do limite",
-        "action":      "Abre o app para\nverificar e categorizar",
-        "reward":      "Vê o impacto no orçamento\nem tempo real com contexto",
-        "investment":  "Transação categorizada\nenriquece histórico e padrões",
-        "notif": "⚡  Você gastou R$180 em delivery esta semana — 60% acima da sua média. Ainda dá tempo de ajustar antes do fim do mês.",
+        "trigger":    "Lembrete baseado em calendário:\nfatura próxima do fechamento",
+        "action":     "Importa o extrato\nou fatura no app",
+        "reward":     "Análise imediata com anomalias\ne impacto no orçamento",
+        "investment": "Histórico categorizado\nenriquece padrões futuros",
+        "notif_pre":  "⚡  Sua fatura costuma fechar no dia 15. Faltam 3 dias — importe agora para ver sua margem.",
+        "notif_post": "✅  Fatura analisada: R$180 em delivery — 60% acima da sua média. Ainda dá tempo de ajustar.",
     },
     {
         "num": "02", "name": "Check-in Semanal",
         "freq": "1× por semana — domingo ou segunda",
         "color": C_SIG,
-        "trigger":     "Resumo automático da semana\ngerado e enviado por push",
-        "action":      "Revisa a semana\ne confirma categorias",
-        "reward":      "Semana em perspectiva,\npadrão novo descoberto",
-        "investment":  "Preferências de categorias\naprimoram sugestões futuras",
-        "notif": "📊  Semana encerrada: R$1.840 gastos · 3 categorias acima do normal · R$420 economizados vs. semana passada.",
+        "trigger":    "Lembrete semanal se não houve\nupload nos últimos 7 dias",
+        "action":     "Importa extrato\nda semana no app",
+        "reward":     "Resumo da semana com\ncomparação vs. semana anterior",
+        "investment": "Preferências de categorias\naprimoram sugestões futuras",
+        "notif_pre":  "📋  Faz 7 dias sem análise. Importe seu extrato de domingo para ver como foi a semana.",
+        "notif_post": "📊  Semana analisada: R$1.840 gastos · 3 categorias acima do normal · R$420 economizados.",
     },
     {
         "num": "03", "name": "Fechamento Mensal",
-        "freq": "1× por mês",
+        "freq": "1× por mês — início do mês seguinte",
         "color": C_GRN,
-        "trigger":     "Relatório mensal gerado\nautomaticamente no fechamento",
-        "action":      "Lê relatório e compara\ncom o mês anterior",
-        "reward":      "Evolução visível,\ncelebração e ranking pessoal",
-        "investment":  "Define meta\npara o próximo mês",
-        "notif": "🎯  Seu relatório de abril está pronto. Você gastou 12% menos que março e sobrou R$680 para investir.",
+        "trigger":    "Lembrete no início do mês:\nextrato do mês anterior disponível",
+        "action":     "Importa o extrato mensal\ndo banco ou fatura",
+        "reward":     "Relatório completo com evolução\ne comparação mês a mês",
+        "investment": "Define meta\npara o próximo mês",
+        "notif_pre":  "📅  É dia 3 de maio. Seu extrato de abril já está disponível — importe para fechar o mês.",
+        "notif_post": "🎯  Abril fechado: você gastou 12% menos que março. Sobrou R$680 disponíveis para investir.",
     },
     {
         "num": "04", "name": "Progresso de Metas",
-        "freq": "2–3× por semana",
+        "freq": "Sempre que há upload com meta ativa",
         "color": C_SOL,
-        "trigger":     "Milestone atingido\nou prazo se aproximando",
-        "action":      "Vê progresso\ne atualiza aporte da meta",
-        "reward":      "Barra de progresso\ne celebração de milestones",
-        "investment":  "Meta mais detalhada\ne prazo calibrado",
-        "notif": "🏆  Você chegou a 70% da reserva de emergência! Faltam R$1.200. No seu ritmo atual: mais 2 meses.",
+        "trigger":    "Meta ativa + X dias sem\natualização de progresso",
+        "action":     "Importa extrato para\natualizar o progresso da meta",
+        "reward":     "Barra de progresso atualizada\ne celebração de milestones",
+        "investment": "Meta mais detalhada\ne prazo calibrado",
+        "notif_pre":  "🎯  Sua meta de reserva está ativa. Importe seu extrato para ver se você está no caminho.",
+        "notif_post": "🏆  Progresso atualizado: 70% da reserva de emergência. Faltam R$1.200 — mais 2 meses no ritmo atual.",
     },
 ]
 
@@ -241,6 +245,72 @@ def slide_hook(prs):
       0.72, 6.08, 11.8, 0.36, sz=11, bold=True, color=C_GRN)
 
 
+def slide_upload_model(prs):
+    slide = blank(prs)
+    bg_fill(slide, C_WHI)
+    footer_line(slide)
+    chapter_label(slide, "O Upload como Evento Central")
+
+    T(slide, "Sem agregação automática, o upload é o eixo de toda a experiência.",
+      0.5, 0.5, 12.5, 0.45, sz=22, bold=True, color=C_OBS)
+    R(slide, 0.5, 0.96, 12.0, 0.035, C_GRN)
+
+    # Central upload box
+    R(slide, 5.42, 2.62, 2.5, 1.12, C_OBS)
+    T(slide, "UPLOAD", 5.42, 2.78, 2.5, 0.38, sz=18, bold=True,
+      color=C_GRN, align=PP_ALIGN.CENTER)
+    T(slide, "extrato ou fatura", 5.42, 3.15, 2.5, 0.38, sz=10,
+      color=C_SMO, align=PP_ALIGN.CENTER)
+
+    # Left: Before upload (triggers that bring user in)
+    R(slide, 0.5, 1.18, 4.62, 4.6, C_CLO)
+    R(slide, 0.5, 1.18, 4.62, 0.06, C_SIG)
+    T(slide, "ANTES DO UPLOAD  ·  trazer o usuário ao app", 0.7, 1.3, 4.25, 0.24,
+      sz=9, bold=True, color=C_SIG)
+    T(slide, "Gatilhos baseados em:", 0.7, 1.62, 4.25, 0.24, sz=10, bold=True, color=C_OBS)
+    ML(slide, [
+        "📅  Calendário — fatura fecha no dia X",
+        "⏱  Tempo — faz N dias sem análise",
+        "🎯  Meta ativa — progresso desatualizado",
+        "📆  Hábito semanal — segunda-feira",
+        "📣  Extrato mensal disponível no banco",
+    ], 0.7, 1.95, 4.2, 2.6, sz=12, color=C_OBS, sp=3.0)
+
+    T(slide, "Objetivo: criar o hábito de importar regularmente,\nnão esperar o usuário lembrar sozinho.",
+      0.7, 4.55, 4.2, 0.8, sz=10, italic=True, color=C_SMO)
+
+    # Arrow left → center
+    T(slide, "→", 5.12, 3.0, 0.35, 0.45, sz=20, bold=True, color=C_SIG, align=PP_ALIGN.CENTER)
+
+    # Right: After upload (immediate reward)
+    R(slide, 8.22, 1.18, 4.6, 4.6, C_CLO)
+    R(slide, 8.22, 1.18, 4.6, 0.06, C_GRN)
+    T(slide, "DEPOIS DO UPLOAD  ·  recompensar o ato", 8.42, 1.3, 4.2, 0.24,
+      sz=9, bold=True, color=C_GRN)
+    T(slide, "Triggers disparados pela análise:", 8.42, 1.62, 4.2, 0.24, sz=10, bold=True, color=C_OBS)
+    ML(slide, [
+        "⚡  Anomalia detectada no extrato",
+        "💰  Economia vs. período anterior",
+        "📊  Resumo semanal ou mensal pronto",
+        "🏆  Milestone de meta atingido",
+        "💡  Insight de categoria incomum",
+    ], 8.42, 1.95, 4.2, 2.6, sz=12, color=C_OBS, sp=3.0)
+
+    T(slide, "Regra crítica: o primeiro insight deve aparecer\nem menos de 3 segundos após o upload.",
+      8.42, 4.55, 4.2, 0.8, sz=10, italic=True, color=C_SMO)
+
+    # Arrow center → right
+    T(slide, "→", 7.92, 3.0, 0.35, 0.45, sz=20, bold=True, color=C_GRN, align=PP_ALIGN.CENTER)
+
+    # Bottom principle
+    R(slide, 0, 5.98, 13.33, 1.0, C_OBS)
+    T(slide, "PRINCÍPIO DE DESIGN", 0.5, 6.08, 4, 0.22, sz=8, bold=True, color=C_GRN)
+    T(slide,
+      "Se o upload não for recompensado com um insight relevante imediatamente, "
+      "o usuário não cria o hábito de importar — e todos os 4 loops deixam de funcionar.",
+      0.5, 6.32, 12.3, 0.5, sz=12, color=C_WHI)
+
+
 def slide_loops_overview(prs):
     slide = blank(prs)
     bg_fill(slide, C_WHI)
@@ -312,10 +382,18 @@ def slide_loop(prs, loop):
       "↺  O investimento acumula contexto que torna o próximo trigger mais relevante — o loop se fortalece a cada ciclo.",
       0.5, 4.82, 12.3, 0.32, sz=10, italic=True, color=C_SMO)
 
-    # Notification band
+    # Two-phase notification band
     R(slide, 0, 5.28, 13.33, 1.94, C_OBS)
-    T(slide, "EXEMPLO DE NOTIFICAÇÃO", 0.5, 5.38, 5, 0.22, sz=8, bold=True, color=color)
-    T(slide, loop["notif"], 0.5, 5.66, 12.33, 1.24, sz=15, italic=True, color=C_WHI)
+    # Pre-upload
+    R(slide, 0, 5.28, 6.55, 0.04, C_SIG)
+    T(slide, "1  LEMBRETE — antes do upload", 0.5, 5.38, 5.8, 0.22, sz=8, bold=True, color=C_SIG)
+    T(slide, loop["notif_pre"],  0.5, 5.62, 6.0, 0.98, sz=13, italic=True, color=C_WHI)
+    # Divider
+    R(slide, 6.62, 5.35, 0.04, 1.72, RGBColor(0x2D, 0x3A, 0x55))
+    # Post-upload
+    R(slide, 6.72, 5.28, 6.55, 0.04, C_GRN)
+    T(slide, "2  PÓS-UPLOAD — após análise", 6.72, 5.38, 5.8, 0.22, sz=8, bold=True, color=C_GRN)
+    T(slide, loop["notif_post"], 6.72, 5.62, 6.1, 0.98, sz=13, italic=True, color=C_WHI)
 
 
 def slide_triggers(prs):
@@ -333,48 +411,48 @@ def slide_triggers(prs):
             "code": "P1", "name": "Jovem Desorganizado",
             "color": C_SIG,
             "triggers": [
-                ("Gasto por impulso",
-                 '"Você gastou R$94 em compras hoje. Quer ver onde foi?"'),
-                ("Fim de semana pesado",
-                 '"Esse fim de semana custou R$380. 45% do seu limite semanal."'),
-                ("Categoria nova detectada",
-                 '"Primeira vez que você gasta em apostas. Quer categorizar?"'),
+                ("Lembrete semanal",
+                 '"Faz 7 dias sem ver seus gastos. Importe o extrato e veja para onde foi o dinheiro."'),
+                ("Pós-upload: impulso detectado",
+                 '"Extrato analisado: R$340 em lazer este mês — 80% foi nos últimos 3 finais de semana."'),
+                ("Fatura próxima do fechamento",
+                 '"Sua fatura fecha em 4 dias. Importe agora para saber quanto você ainda pode gastar."'),
             ],
         },
         {
             "code": "P2", "name": "Endividado Crônico",
             "color": C_RED,
             "triggers": [
-                ("Fatura se aproximando",
-                 '"Fatura fecha em 3 dias. Você tem R$280 de margem — não ultrapasse."'),
-                ("Pagamento mínimo detectado",
-                 '"Pagamento mínimo detectado. Isso custa R$142 em juros este mês."'),
+                ("Alerta preventivo de fatura",
+                 '"Fatura fecha em 3 dias. Importe para ver sua margem antes de gastar mais."'),
+                ("Pós-upload: mínimo detectado",
+                 '"Fatura importada: pagamento mínimo identificado. Isso custa R$142 em juros este mês."'),
                 ("Progresso na dívida",
-                 '"Você reduziu R$800 da dívida este mês. Continue assim: 4 meses para zerar."'),
+                 '"Extrato do mês importado. Você reduziu R$800 da dívida — 4 meses para zerar no ritmo atual."'),
             ],
         },
         {
             "code": "P3", "name": "Investidor Iniciante",
             "color": C_GRN,
             "triggers": [
-                ("Sobra calculada",
-                 '"Sobrou R$530 este mês. Renderiam R$62 no CDB até dezembro."'),
+                ("Fechamento do mês",
+                 '"É dia 3. Importe o extrato de abril para calcular quanto sobrou para investir."'),
+                ("Pós-upload: sobra calculada",
+                 '"Abril fechado: sobrou R$530. Aplicados em CDB renderiam R$62 até dezembro."'),
                 ("Meta de investimento",
-                 '"Você está a R$1.200 da meta de R$10.000 em renda fixa."'),
-                ("Oportunidade de corte",
-                 '"Você gastou R$420 em assinaturas. 3 delas você não usa há 60 dias."'),
+                 '"Sua meta de R$10.000 em renda fixa está ativa. Importe o extrato para atualizar."'),
             ],
         },
         {
             "code": "P5", "name": "Profissional Ocupado",
             "color": C_SMO,
             "triggers": [
-                ("Relatório disponível",
-                 '"Relatório de maio pronto: 2 gastos incomuns e R$1.100 de sobra."'),
-                ("Gasto corporativo fora do padrão",
-                 '"Reembolso pendente: R$640 em viagens de abril ainda não lançado."'),
-                ("Projeção de patrimônio",
-                 '"No ritmo atual, você chega a R$180k em patrimônio em 3 anos."'),
+                ("Relatório mensal disponível",
+                 '"É início do mês. Importe os extratos de abril para gerar seu relatório em 1 minuto."'),
+                ("Pós-upload: anomalia detectada",
+                 '"Extrato analisado: 2 gastos incomuns detectados e R$1.100 de sobra identificada."'),
+                ("Meta de patrimônio",
+                 '"Importe seu extrato para atualizar a projeção de patrimônio. Última atualização: 18 dias atrás."'),
             ],
         },
     ]
@@ -459,6 +537,7 @@ def main():
     slide_cover(prs)
     slide_problem(prs)
     slide_hook(prs)
+    slide_upload_model(prs)
     slide_loops_overview(prs)
     for loop in LOOPS:
         slide_loop(prs, loop)

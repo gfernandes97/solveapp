@@ -22,7 +22,7 @@ no topo de `scripts/generate_presentations.py`. Para criar uma nova versão:
 
 | Arquivo | Versão | Data | Slides | Descrição |
 |---------|--------|------|--------|-----------|
-| [retention-v1.0.0.pptx](retention-v1.0.0.pptx) | v1.0.0 | 2026-05-13 | 10 | Retention loop · Hook Framework · 4 loops · triggers por persona · métricas |
+| [retention-v1.0.0.pptx](retention-v1.0.0.pptx) | v1.0.0 | 2026-05-13 | 11 | Retention loop · Hook Framework · upload como evento central · 4 loops · triggers por persona · métricas |
 | [positioning-v1.0.0.pptx](positioning-v1.0.0.pptx) | v1.0.0 | 2026-05-12 | 9 | Positioning statement · 5 componentes · vs. concorrência · proof points |
 | [messaging-v1.0.0.pptx](messaging-v1.0.0.pptx) | v1.0.0 | 2026-05-12 | 11 | Messaging framework · hero universal · 4 personas · regras · lista negra |
 | [brand-manual-v1.0.0.pptx](brand-manual-v1.0.0.pptx) | v1.0.0 | 2026-05-12 | 12 | Manual da marca Solve · paleta · logos · tipografia · voz |
