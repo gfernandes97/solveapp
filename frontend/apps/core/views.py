@@ -83,7 +83,7 @@ def pricing(request):
             "description": "Para começar a se organizar.",
             "features": ["Até 2 contas", "Controle de gastos básico", "Resumo mensal"],
             "cta": "Começar grátis",
-            "href": "/accounts/register/",
+            "href": "/onboarding/start/?plan=free",
             "highlight": False,
         },
         {
@@ -99,7 +99,7 @@ def pricing(request):
                 "Alertas de limite e vencimento",
             ],
             "cta": "Assinar Essencial",
-            "href": "/accounts/register/?plan=essencial",
+            "href": "/onboarding/start/?plan=essencial",
             "highlight": True,
         },
         {
@@ -116,7 +116,7 @@ def pricing(request):
                 "Suporte prioritário",
             ],
             "cta": "Assinar Pro",
-            "href": "/accounts/register/?plan=pro",
+            "href": "/onboarding/start/?plan=pro",
             "highlight": False,
         },
     ]

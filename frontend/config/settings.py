@@ -43,6 +43,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "apps.accounts.middleware.SubscriptionCheckMiddleware",
 ]
 
 SITE_ID = 1
@@ -106,17 +107,20 @@ CRISPY_TEMPLATE_PACK = "tailwind"
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/dashboard/"
+LOGIN_REDIRECT_URL = "/onboarding/plan/"
 LOGOUT_REDIRECT_URL = "/"
 
 # ── allauth ───────────────────────────────────────────────────────────────────
+# Redireciona direto ao Google sem página de confirmação intermediária
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_LOGIN_METHODS = {"email"}
 # "none" para dev local (sem e-mail de confirmação)
 # "optional" ou "mandatory" para produção
 ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="none")
-ACCOUNT_SIGNUP_REDIRECT_URL = "/onboarding/"
+ACCOUNT_SIGNUP_REDIRECT_URL = "/dashboard/"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/"
 
 SOCIALACCOUNT_PROVIDERS = {

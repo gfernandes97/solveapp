@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Escolha seu plano{% endblock %}
+
+{% block body %}
+<div class="flex min-h-screen flex-col bg-slate-50">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4">
+    <a href="{% url 'home' %}" class="flex items-center gap-2.5">
+      <svg class="h-8 w-8 text-solve" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M20.5 8.9A9 9 0 1 1 15.8 3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="8" y1="16" x2="20.2" y2="3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <polyline points="17.8,4.5 20.2,3.8 19.6,6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <span class="text-lg font-black tracking-tight text-obsidian">solve</span>
+    </a>
+    <p class="text-sm text-smoke">
+      Olá, <span class="font-medium text-obsidian">{{ request.user.first_name|default:request.user.email }}</span>
+    </p>
+  </header>
+
+  <!-- Content -->
+  <main class="flex flex-1 flex-col items-center justify-center px-6 py-16">
+
+    <div class="mb-10 text-center">
+      <p class="mb-2 text-xs font-bold uppercase tracking-widest text-solve">Último passo</p>
+      <h1 class="text-3xl font-black tracking-tight text-obsidian md:text-4xl">
+        Escolha o plano ideal para você
+      </h1>
+      <p class="mt-3 text-sm text-smoke">Sem taxa de adesão. Cancele quando quiser.</p>
+    </div>
+
+    <div class="grid w-full max-w-4xl gap-4 sm:grid-cols-3">
+      {% for plan in plans %}
+      <form method="post" action="{% url 'onboarding_plan' %}">
+        {% csrf_token %}
+        <input type="hidden" name="plan_slug" value="{{ plan.slug }}">
+        <button type="submit" class="group w-full text-left">
+          <div class="relative flex h-full flex-col rounded-2xl border p-6 transition-all duration-200
+            {% if plan.slug == 'essencial' %}
+              border-solve bg-white shadow-lg shadow-solve/10 ring-1 ring-solve/30
+            {% else %}
+              border-slate-200 bg-white hover:border-solve/40 hover:shadow-md
+            {% endif %}">
+
+            {% if plan.slug == 'essencial' %}
+            <div class="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-solve px-3 py-0.5 text-xs font-bold uppercase tracking-widest text-obsidian shadow-sm shadow-solve/30">
+              Mais popular
+            </div>
+            {% endif %}
+
+            <div class="mb-4">
+              <p class="text-base font-bold text-obsidian">{{ plan.name }}</p>
+              <div class="mt-2 flex items-baseline gap-1">
+                {% if plan.price == 0 %}
+                  <span class="text-3xl font-black text-obsidian">Grátis</span>
+                {% else %}
+                  <span class="text-xs text-smoke">R$</span>
+                  <span class="text-3xl font-black text-obsidian">{{ plan.price }}</span>
+                  <span class="text-xs text-smoke">/mês</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <ul class="mb-6 flex-1 space-y-2">
+              {% if plan.slug == 'free' %}
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Até 2 contas</li>
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Controle de gastos básico</li>
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Resumo mensal</li>
+              {% elif plan.slug == 'essencial' %}
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Contas ilimitadas</li>
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Importação ilimitada de extratos</li>
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Categorização automática</li>
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Relatórios mensais</li>
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Alertas de limite e vencimento</li>
+              {% else %}
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Tudo do Essencial</li>
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Portfólio de investimentos</li>
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Metas financeiras</li>
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Orientação personalizada</li>
+                <li class="flex items-center gap-2 text-sm text-smoke"><svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Suporte prioritário</li>
+              {% endif %}
+            </ul>
+
+            <span class="block w-full rounded-lg py-2.5 text-center text-sm font-bold transition-all duration-200
+              {% if plan.slug == 'essencial' %}
+                bg-solve text-obsidian group-hover:bg-solve-light
+              {% else %}
+                border border-slate-200 text-obsidian group-hover:border-solve/50 group-hover:text-solve
+              {% endif %}">
+              {% if plan.price == 0 %}Começar grátis{% else %}Escolher {{ plan.name }}{% endif %}
+            </span>
+
+          </div>
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+
+    <!-- Cancel -->
+    <div class="mt-10 text-center">
+      <p class="text-sm text-smoke">Não quer criar uma conta agora?</p>
+      <form method="post" action="{% url 'onboarding_cancel' %}" class="mt-1 inline">
+        {% csrf_token %}
+        <button type="submit" class="text-sm text-smoke underline underline-offset-2 transition-colors hover:text-red-500">
+          Cancelar e excluir minha conta
+        </button>
+      </form>
+    </div>
+
+  </main>
+</div>
+{% endblock %}

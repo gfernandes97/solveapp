@@ -9,4 +9,6 @@ urlpatterns = [
     path("accounts/", include("apps.accounts.urls")),
     # allauth: social auth (Google), password reset, email confirmation, etc.
     path("accounts/", include("allauth.urls")),
+    # onboarding pós-cadastro: escolha de plano
+    path("onboarding/", include("apps.accounts.onboarding_urls")),
 ]
