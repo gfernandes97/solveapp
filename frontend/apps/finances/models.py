@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import User
 from django.db import models
 
@@ -24,6 +26,7 @@ class Account(models.Model):
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     bank_name = models.CharField(max_length=100, blank=True)
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    balance_date = models.DateField(null=True, blank=True)
     # Campos exclusivos de cartão de crédito
     credit_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     closing_day = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -114,6 +117,9 @@ class Transaction(models.Model):
     is_installment = models.BooleanField(default=False)
     installment_number = models.PositiveSmallIntegerField(null=True, blank=True)
     installment_total = models.PositiveSmallIntegerField(null=True, blank=True)
+    goal = models.ForeignKey(
+        "Goal", on_delete=models.SET_NULL, null=True, blank=True, related_name="contributions"
+    )
     # Preenchido quando a transação veio de um extrato importado
     imported_from = models.ForeignKey(
         "Statement", on_delete=models.SET_NULL, null=True, blank=True, related_name="transactions"
@@ -200,6 +206,97 @@ class Goal(models.Model):
         if not self.target_amount:
             return 0
         return min(int((self.current_amount / self.target_amount) * 100), 100)
+
+
+class RecurringTransaction(models.Model):
+    """Lançamento recorrente (fixo) — salário, aluguel, assinatura, etc."""
+
+    FREQ_WEEKLY = "weekly"
+    FREQ_BIWEEKLY = "biweekly"
+    FREQ_MONTHLY = "monthly"
+    FREQ_QUARTERLY = "quarterly"
+    FREQ_SEMIANNUAL = "semiannual"
+    FREQ_ANNUAL = "annual"
+
+    FREQUENCY_CHOICES = [
+        (FREQ_WEEKLY, "Semanal"),
+        (FREQ_BIWEEKLY, "Quinzenal"),
+        (FREQ_MONTHLY, "Mensal"),
+        (FREQ_QUARTERLY, "Trimestral"),
+        (FREQ_SEMIANNUAL, "Semestral"),
+        (FREQ_ANNUAL, "Anual"),
+    ]
+
+    TYPE_INCOME = "income"
+    TYPE_EXPENSE = "expense"
+
+    TYPE_CHOICES = [
+        (TYPE_INCOME, "Entrada"),
+        (TYPE_EXPENSE, "Saída"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recurring_transactions")
+    account = models.ForeignKey(
+        Account, on_delete=models.SET_NULL, null=True, blank=True, related_name="recurring_transactions"
+    )
+    category = models.ForeignKey(
+        Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="recurring_transactions"
+    )
+    name = models.CharField(max_length=200)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES)
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    # dia do mês (1-31) para frequências mensais/trimestrais/etc.
+    day_of_month = models.PositiveSmallIntegerField(null=True, blank=True)
+    # dia da semana (0=segunda) para frequências semanais/quinzenais
+    day_of_week = models.PositiveSmallIntegerField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["type", "name"]
+        verbose_name = "Lançamento Recorrente"
+        verbose_name_plural = "Lançamentos Recorrentes"
+
+    def __str__(self):
+        return f"{self.name} ({self.get_frequency_display()}) — {self.user.email}"
+
+    @property
+    def monthly_amount(self):
+        """Valor equivalente mensal para projeções."""
+        factors = {
+            self.FREQ_WEEKLY: Decimal("52") / Decimal("12"),
+            self.FREQ_BIWEEKLY: Decimal("26") / Decimal("12"),
+            self.FREQ_MONTHLY: Decimal("1"),
+            self.FREQ_QUARTERLY: Decimal("1") / Decimal("3"),
+            self.FREQ_SEMIANNUAL: Decimal("1") / Decimal("6"),
+            self.FREQ_ANNUAL: Decimal("1") / Decimal("12"),
+        }
+        return self.amount * factors.get(self.frequency, Decimal("1"))
+
+
+class AccountMonthSnapshot(models.Model):
+    """Saldo registrado pelo usuário no fechamento de cada mês, por conta."""
+
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="monthly_snapshots")
+    month = models.DateField()  # sempre dia 1 do mês
+    balance = models.DecimalField(max_digits=12, decimal_places=2)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("account", "month")
+        ordering = ["-month"]
+        verbose_name = "Saldo Mensal"
+        verbose_name_plural = "Saldos Mensais"
+
+    def __str__(self):
+        return f"{self.account.name} — {self.month:%Y-%m} — R${self.balance}"
 
 
 class Investment(models.Model):

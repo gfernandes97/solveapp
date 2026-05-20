@@ -1,0 +1,982 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}Lançamentos{% endblock %}
+{% block header_title %}Lançamentos{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <!-- Navegação de mês -->
+    <div class="flex items-center gap-3">
+      <a href="?ano={{ prev_year }}&mes={{ prev_month }}&tab={{ tab }}"
+         class="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-smoke transition-colors hover:bg-slate-50">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <h1 class="min-w-36 text-center text-lg font-black capitalize text-obsidian">
+        {{ month_name }} {{ year }}
+      </h1>
+      <a href="?ano={{ next_year }}&mes={{ next_month }}&tab={{ tab }}"
+         class="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-smoke transition-colors hover:bg-slate-50">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+    <!-- Botões de ação -->
+    <div class="flex gap-2">
+      <button onclick="document.getElementById('modal-entrada').classList.remove('hidden')"
+              class="inline-flex items-center gap-2 rounded-lg bg-solve px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-solve-dark">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
+        </svg>
+        Entrada variável
+      </button>
+      <button onclick="document.getElementById('modal-saida').classList.remove('hidden')"
+              class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-obsidian shadow-sm transition-colors hover:bg-slate-50">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6"/>
+        </svg>
+        Saída variável
+      </button>
+    </div>
+  </div>
+
+  <!-- Resumo do mês -->
+  <div class="grid gap-4 sm:grid-cols-3">
+    <div class="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <p class="text-sm font-medium text-smoke">Entradas</p>
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-solve/10">
+          <svg class="h-3.5 w-3.5 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
+          </svg>
+        </div>
+      </div>
+      <p class="mt-3 text-2xl font-black text-obsidian">R$&nbsp;{{ income|brl }}</p>
+    </div>
+    <div class="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <p class="text-sm font-medium text-smoke">Saídas</p>
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50">
+          <svg class="h-3.5 w-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6"/>
+          </svg>
+        </div>
+      </div>
+      <p class="mt-3 text-2xl font-black text-obsidian">R$&nbsp;{{ expense|brl }}</p>
+    </div>
+    <div class="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <p class="text-sm font-medium text-smoke">Saldo do mês</p>
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-signal/10">
+          <svg class="h-3.5 w-3.5 text-signal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+          </svg>
+        </div>
+      </div>
+      <p class="mt-3 text-2xl font-black {% if balance >= 0 %}text-solve{% else %}text-red-500{% endif %}">
+        R$&nbsp;{{ balance|brl }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Tabs + Lista de lançamentos -->
+  <div class="rounded-xl border border-slate-100 bg-white shadow-sm">
+
+    <!-- Tabs -->
+    <div class="flex border-b border-slate-100">
+      {% for slug, label in tab_defs %}
+      <a href="?ano={{ year }}&mes={{ month }}&tab={{ slug }}"
+         class="px-4 py-3 text-sm font-medium transition-colors border-b-2
+         {% if tab == slug %}border-solve text-solve{% else %}border-transparent text-smoke hover:text-obsidian{% endif %}">
+        {{ label }}
+      </a>
+      {% endfor %}
+    </div>
+
+    {% if tab == "fixos" %}
+      <!-- Lançamentos recorrentes -->
+      <div class="px-5 py-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-semibold text-obsidian">Lançamentos fixos</p>
+            <p class="text-xs text-smoke mt-0.5">Entradas e saídas recorrentes automatizadas</p>
+          </div>
+          <button onclick="document.getElementById('modal-recorrente').classList.remove('hidden')"
+                  class="inline-flex items-center gap-1.5 rounded-lg bg-obsidian px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-obsidian/90">
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Novo fixo
+          </button>
+        </div>
+
+        {% if recurring %}
+          <!-- Resumo fixos -->
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <div class="rounded-lg bg-solve/5 border border-solve/15 p-3">
+              <p class="text-xs text-smoke">Entradas fixas / mês</p>
+              <p class="mt-1 text-lg font-black text-solve">R$&nbsp;{{ rec_income|brl }}</p>
+            </div>
+            <div class="rounded-lg bg-red-50 border border-red-100 p-3">
+              <p class="text-xs text-smoke">Saídas fixas / mês</p>
+              <p class="mt-1 text-lg font-black text-red-500">R$&nbsp;{{ rec_expense|brl }}</p>
+            </div>
+          </div>
+
+          <!-- Entradas fixas -->
+          <div class="mt-5 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wider text-smoke">Entradas</p>
+            {% for r in recurring %}{% if r.type == "income" %}
+            <div class="flex items-center justify-between rounded-lg border border-slate-100 px-4 py-3 group">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-solve/10">
+                  {% if r.category and r.category.icon %}{% category_icon r.category.icon "h-4 w-4 text-solve" %}{% else %}
+                  <svg class="h-4 w-4 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
+                  </svg>
+                  {% endif %}
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-obsidian">{{ r.name }}</p>
+                  <p class="text-xs text-smoke">
+                    {{ r.get_frequency_display }}
+                    {% if r.category %} · <span class="text-obsidian/70">{{ r.category.name }}</span>{% endif %}
+                    {% if r.account %} · {{ r.account.name }}{% endif %}
+                    · desde {{ r.start_date|date:"d/m/Y" }}
+                    {% if r.end_date %} · <span class="text-solar">expira {{ r.end_date|date:"d/m/Y" }}</span>{% endif %}
+                  </p>
+                </div>
+              </div>
+              <div class="flex flex-shrink-0 items-center gap-1 ml-3">
+                <p class="text-sm font-bold text-solve mr-2">R$&nbsp;{{ r.amount|brl }}</p>
+                <button onclick="openEditFixo({{ r.pk }}, '{{ r.name|escapejs }}', '{{ r.amount }}', '{{ r.type }}', '{{ r.frequency }}', '{{ r.start_date|date:'Y-m-d' }}', '{{ r.account.pk|default:'' }}', '{{ r.day_of_month|default:'' }}', '{{ r.day_of_week|default:'' }}', '{{ r.category.pk|default:'' }}', '{{ r.end_date|date:"Y-m-d"|default:"" }}')"
+                        class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke transition-colors hover:bg-slate-100 hover:text-obsidian">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                  </svg>
+                </button>
+                <form method="post" action="{% url 'fixo_excluir' r.pk %}" onsubmit="return confirm('Excluir lançamento fixo?')">
+                  {% csrf_token %}
+                  <button type="submit" class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke transition-colors hover:bg-red-50 hover:text-red-500">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+            {% endif %}{% endfor %}
+
+            <p class="mt-3 text-xs font-semibold uppercase tracking-wider text-smoke">Saídas</p>
+            {% for r in recurring %}{% if r.type == "expense" %}
+            <div class="flex items-center justify-between rounded-lg border border-slate-100 px-4 py-3 group">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-50">
+                  {% if r.category and r.category.icon %}{% category_icon r.category.icon "h-4 w-4 text-red-500" %}{% else %}
+                  <svg class="h-4 w-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6"/>
+                  </svg>
+                  {% endif %}
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-obsidian">{{ r.name }}</p>
+                  <p class="text-xs text-smoke">
+                    {{ r.get_frequency_display }}
+                    {% if r.category %} · <span class="text-obsidian/70">{{ r.category.name }}</span>{% endif %}
+                    {% if r.account %} · {{ r.account.name }}{% endif %}
+                    · desde {{ r.start_date|date:"d/m/Y" }}
+                    {% if r.end_date %} · <span class="text-solar">expira {{ r.end_date|date:"d/m/Y" }}</span>{% endif %}
+                  </p>
+                </div>
+              </div>
+              <div class="flex flex-shrink-0 items-center gap-1 ml-3">
+                <p class="text-sm font-bold text-red-500 mr-2">R$&nbsp;{{ r.amount|brl }}</p>
+                <button onclick="openEditFixo({{ r.pk }}, '{{ r.name|escapejs }}', '{{ r.amount }}', '{{ r.type }}', '{{ r.frequency }}', '{{ r.start_date|date:'Y-m-d' }}', '{{ r.account.pk|default:'' }}', '{{ r.day_of_month|default:'' }}', '{{ r.day_of_week|default:'' }}', '{{ r.category.pk|default:'' }}', '{{ r.end_date|date:"Y-m-d"|default:"" }}')"
+                        class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke transition-colors hover:bg-slate-100 hover:text-obsidian">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                  </svg>
+                </button>
+                <form method="post" action="{% url 'fixo_excluir' r.pk %}" onsubmit="return confirm('Excluir lançamento fixo?')">
+                  {% csrf_token %}
+                  <button type="submit" class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke transition-colors hover:bg-red-50 hover:text-red-500">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+            {% endif %}{% endfor %}
+          </div>
+        {% else %}
+          <div class="mt-6 flex flex-col items-center gap-3 py-8 text-center">
+            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-solve/10">
+              <svg class="h-6 w-6 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+            </div>
+            <p class="text-sm font-medium text-obsidian">Nenhum lançamento fixo</p>
+            <p class="max-w-xs text-xs text-smoke">Cadastre salário, aluguel, assinaturas e o Solve vai projetar automaticamente seu fluxo de caixa.</p>
+          </div>
+        {% endif %}
+      </div>
+
+    {% elif tab == "categorias" %}
+      <!-- Categorias -->
+      <div class="px-5 py-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-semibold text-obsidian">Categorias</p>
+            <p class="text-xs text-smoke mt-0.5">Padrão + personalizadas — usadas em lançamentos e fixos</p>
+          </div>
+          <button onclick="document.getElementById('modal-nova-categoria').classList.remove('hidden')"
+                  class="inline-flex items-center gap-1.5 rounded-lg bg-obsidian px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-obsidian/90">
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Nova categoria
+          </button>
+        </div>
+
+        <div class="mt-5 grid gap-6 lg:grid-cols-2">
+
+          <!-- Entradas -->
+          <div>
+            <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-smoke">Entradas</p>
+            <div class="space-y-1.5">
+              {% for cat in categories %}{% if cat.type == "income" %}
+              <div class="flex items-center justify-between rounded-lg border border-slate-100 bg-white px-3 py-2.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full"
+                       style="background-color:{{ cat.color }}22; color:{{ cat.color }}">
+                    {% if cat.icon %}{% category_icon cat.icon "h-3.5 w-3.5" %}{% else %}
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+                    {% endif %}
+                  </div>
+                  <p class="text-sm font-medium text-obsidian">{{ cat.name }}</p>
+                  {% if cat.is_default %}<span class="text-xs text-smoke/50 bg-slate-100 px-1.5 py-0.5 rounded">Padrão</span>{% endif %}
+                </div>
+                {% if cat.user %}
+                <form method="post" action="{% url 'categoria_excluir' cat.pk %}" onsubmit="return confirm('Excluir categoria?')" class="inline">
+                  {% csrf_token %}
+                  <button type="submit" class="flex h-6 w-6 items-center justify-center rounded text-smoke hover:bg-red-50 hover:text-red-500 transition-colors">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+              {% endif %}{% endfor %}
+            </div>
+          </div>
+
+          <!-- Saídas -->
+          <div>
+            <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-smoke">Saídas</p>
+            <div class="space-y-1.5">
+              {% for cat in categories %}{% if cat.type == "expense" %}
+              <div class="flex items-center justify-between rounded-lg border border-slate-100 bg-white px-3 py-2.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full"
+                       style="background-color:{{ cat.color }}22; color:{{ cat.color }}">
+                    {% if cat.icon %}{% category_icon cat.icon "h-3.5 w-3.5" %}{% else %}
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+                    {% endif %}
+                  </div>
+                  <p class="text-sm font-medium text-obsidian">{{ cat.name }}</p>
+                  {% if cat.is_default %}<span class="text-xs text-smoke/50 bg-slate-100 px-1.5 py-0.5 rounded">Padrão</span>{% endif %}
+                </div>
+                {% if cat.user %}
+                <form method="post" action="{% url 'categoria_excluir' cat.pk %}" onsubmit="return confirm('Excluir categoria?')" class="inline">
+                  {% csrf_token %}
+                  <button type="submit" class="flex h-6 w-6 items-center justify-center rounded text-smoke hover:bg-red-50 hover:text-red-500 transition-colors">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+              {% endif %}{% endfor %}
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    {% else %}
+      <!-- Lista de transações do mês (fixos + variáveis) -->
+      <ul class="divide-y divide-slate-50">
+
+        <!-- Lançamentos fixos ativos no mês -->
+        {% for r in recurring %}{% if tab == "todos" or tab == "entradas" and r.type == "income" or tab == "saidas" and r.type == "expense" %}
+        <li class="flex items-center justify-between px-5 py-3.5 bg-slate-50/70 group">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full
+                        {% if r.type == 'income' %}bg-solve/10{% else %}bg-red-50{% endif %}">
+              {% if r.category and r.category.icon %}
+                {% if r.type == "income" %}{% category_icon r.category.icon "h-4 w-4 text-solve" %}{% else %}{% category_icon r.category.icon "h-4 w-4 text-red-500" %}{% endif %}
+              {% elif r.type == "income" %}
+              <svg class="h-4 w-4 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
+              </svg>
+              {% else %}
+              <svg class="h-4 w-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6"/>
+              </svg>
+              {% endif %}
+            </div>
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-obsidian truncate">{{ r.name }}</p>
+              <p class="text-xs text-smoke">
+                {{ r.get_frequency_display }}
+                {% if r.account %} · {{ r.account.name }}{% endif %}
+                · <span class="text-signal font-semibold">Fixo</span>
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-shrink-0 items-center gap-2 ml-3">
+            <p class="text-sm font-bold {% if r.type == 'income' %}text-solve{% else %}text-red-500{% endif %}">
+              {% if r.type == 'income' %}+{% else %}-{% endif %}R$&nbsp;{{ r.amount|brl }}
+            </p>
+            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onclick="openEditFixo({{ r.pk }}, '{{ r.name|escapejs }}', '{{ r.amount }}', '{{ r.type }}', '{{ r.frequency }}', '{{ r.start_date|date:'Y-m-d' }}', '{{ r.account.pk|default:'' }}', '{{ r.day_of_month|default:'' }}', '{{ r.day_of_week|default:'' }}', '{{ r.category.pk|default:'' }}', '{{ r.end_date|date:"Y-m-d"|default:"" }}')"
+                      class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke hover:bg-slate-100 hover:text-obsidian transition-colors">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </li>
+        {% endif %}{% endfor %}
+
+        <!-- Lançamentos variáveis -->
+        {% for tx in txs %}
+        <li class="flex items-center justify-between px-5 py-3.5 group">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full
+                        {% if tx.type == 'credit' %}bg-solve/10{% else %}bg-red-50{% endif %}">
+              {% if tx.category and tx.category.icon %}
+                {% if tx.type == "credit" %}{% category_icon tx.category.icon "h-4 w-4 text-solve" %}{% else %}{% category_icon tx.category.icon "h-4 w-4 text-red-500" %}{% endif %}
+              {% elif tx.type == "credit" %}
+              <svg class="h-4 w-4 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
+              </svg>
+              {% else %}
+              <svg class="h-4 w-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6"/>
+              </svg>
+              {% endif %}
+            </div>
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-obsidian truncate">{{ tx.description }}</p>
+              <p class="text-xs text-smoke">
+                {{ tx.date|date:"d/m" }}
+                {% if tx.category %} · {{ tx.category.name }}{% endif %}
+                {% if tx.account %} · {{ tx.account.name }}{% endif %}
+                {% if tx.goal %} · <span class="font-medium text-signal">{{ tx.goal.name }}</span>{% endif %}
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-shrink-0 items-center gap-2 ml-3">
+            <p class="text-sm font-bold {% if tx.type == 'credit' %}text-solve{% else %}text-red-500{% endif %}">
+              {% if tx.type == 'credit' %}+{% else %}-{% endif %}R$&nbsp;{{ tx.amount|brl }}
+            </p>
+            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onclick="openEditTx({{ tx.pk }}, '{{ tx.description|escapejs }}', '{{ tx.amount }}', '{{ tx.date|date:'Y-m-d' }}', '{{ tx.type }}', '{{ tx.account.pk }}', '{{ tx.category.pk|default:'' }}', '{{ tx.goal.pk|default:'' }}')"
+                class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke hover:bg-slate-100 hover:text-obsidian transition-colors">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+              </button>
+              <form method="post" action="{% url 'lancamento_excluir' tx.pk %}" onsubmit="return confirm('Excluir lançamento?')" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke hover:bg-red-50 hover:text-red-500 transition-colors">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+
+      </ul>
+      {% if not txs and not recurring %}
+        <div class="flex flex-col items-center gap-3 py-12 text-center">
+          <div class="flex h-12 w-12 items-center justify-center rounded-full bg-solve/10">
+            <svg class="h-6 w-6 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+            </svg>
+          </div>
+          <p class="text-sm font-medium text-obsidian">Nenhum lançamento em {{ month_name }}</p>
+          <p class="max-w-xs text-xs text-smoke">Registre entradas e saídas manualmente ou importe um extrato bancário.</p>
+        </div>
+      {% endif %}
+    {% endif %}
+
+  </div>
+
+</div>
+
+<!-- ─── Modal: Nova Entrada ─── -->
+<div id="modal-entrada" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-black text-obsidian">Nova Entrada</h2>
+        <p class="text-xs text-smoke mt-0.5">Lançamento pontual / variável</p>
+      </div>
+      <button onclick="document.getElementById('modal-entrada').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'lancamentos' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="tx_type" value="credit">
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Descrição</label>
+        <input type="text" name="description" required placeholder="Ex: Salário de novembro, Freelance…" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Valor (R$)</label>
+          <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0,00" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Data</label>
+          <input type="date" name="date" value="{{ today }}" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Conta</label>
+        <select name="account" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">Selecione…</option>
+          {% for acc in accounts %}
+          <option value="{{ acc.id }}">{{ acc.name }}{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Categoria (opcional)</label>
+        <select name="category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">Sem categoria</option>
+          {% for cat in categories %}{% if cat.type == "income" %}
+          <option value="{{ cat.id }}">{{ cat.name }}</option>
+          {% endif %}{% endfor %}
+        </select>
+      </div>
+      {% if goals %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Atribuir a uma meta (opcional)</label>
+        <select name="goal" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">— Nenhuma meta —</option>
+          {% for g in goals %}
+          <option value="{{ g.id }}">{{ g.name }} ({{ g.progress_percent }}%)</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <p class="text-xs text-smoke rounded-lg bg-slate-50 px-3 py-2">
+        Para receitas recorrentes (salário, aluguel…) use a aba <strong>Fixos</strong>.
+      </p>
+      <button type="submit" class="w-full rounded-lg bg-solve py-3 text-sm font-black text-white transition-colors hover:bg-solve-dark">
+        Registrar entrada
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── Modal: Nova Saída ─── -->
+<div id="modal-saida" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-black text-obsidian">Nova Saída</h2>
+        <p class="text-xs text-smoke mt-0.5">Lançamento pontual / variável</p>
+      </div>
+      <button onclick="document.getElementById('modal-saida').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'lancamentos' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="tx_type" value="debit">
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Descrição</label>
+        <input type="text" name="description" required placeholder="Ex: Supermercado, Restaurante…" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Valor (R$)</label>
+          <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0,00" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Data</label>
+          <input type="date" name="date" value="{{ today }}" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Conta</label>
+        <select name="account" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">Selecione…</option>
+          {% for acc in accounts %}
+          <option value="{{ acc.id }}">{{ acc.name }}{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Categoria (opcional)</label>
+        <select name="category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">Sem categoria</option>
+          {% for cat in categories %}{% if cat.type == "expense" %}
+          <option value="{{ cat.id }}">{{ cat.name }}</option>
+          {% endif %}{% endfor %}
+        </select>
+      </div>
+      {% if goals %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Atribuir a uma meta (opcional)</label>
+        <select name="goal" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">— Nenhuma meta —</option>
+          {% for g in goals %}
+          <option value="{{ g.id }}">{{ g.name }} ({{ g.progress_percent }}%)</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <p class="text-xs text-smoke rounded-lg bg-slate-50 px-3 py-2">
+        Para despesas recorrentes (aluguel, assinaturas…) use a aba <strong>Fixos</strong>.
+      </p>
+      <button type="submit" class="w-full rounded-lg bg-obsidian py-3 text-sm font-black text-white transition-colors hover:bg-obsidian/90">
+        Registrar saída
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── Modal: Novo Fixo ─── -->
+<div id="modal-recorrente" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-black text-obsidian">Novo lançamento fixo</h2>
+        <p class="text-xs text-smoke mt-0.5">Entrada ou saída recorrente</p>
+      </div>
+      <button onclick="document.getElementById('modal-recorrente').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'fixo_criar' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Nome</label>
+        <input type="text" name="name" required placeholder="Ex: Salário, Aluguel, Netflix…" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Tipo</label>
+          <select name="type" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+            <option value="income">Entrada</option>
+            <option value="expense">Saída</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Valor (R$)</label>
+          <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0,00" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Frequência</label>
+          <select id="fixo-frequency" name="frequency" onchange="updateDayField()" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+            <option value="weekly">Semanal</option>
+            <option value="biweekly">Quinzenal</option>
+            <option value="monthly" selected>Mensal</option>
+            <option value="quarterly">Trimestral</option>
+            <option value="semiannual">Semestral</option>
+            <option value="annual">Anual</option>
+          </select>
+        </div>
+        <!-- Day field: toggled by JS -->
+        <div id="fixo-day-week-wrap">
+          <label class="block text-xs font-semibold text-smoke">Dia da semana</label>
+          <select name="day_of_week" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+            <option value="0">Segunda-feira</option>
+            <option value="1">Terça-feira</option>
+            <option value="2">Quarta-feira</option>
+            <option value="3">Quinta-feira</option>
+            <option value="4">Sexta-feira</option>
+            <option value="5">Sábado</option>
+            <option value="6">Domingo</option>
+          </select>
+        </div>
+        <div id="fixo-day-month-wrap" class="hidden">
+          <label class="block text-xs font-semibold text-smoke">Dia do mês</label>
+          <input type="number" name="day_of_month" min="1" max="28" placeholder="Ex: 5"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Categoria (opcional)</label>
+        <select name="category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">Sem categoria</option>
+          <optgroup label="Entradas">
+            {% for cat in categories %}{% if cat.type == "income" %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endif %}{% endfor %}
+          </optgroup>
+          <optgroup label="Saídas">
+            {% for cat in categories %}{% if cat.type == "expense" %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endif %}{% endfor %}
+          </optgroup>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Conta <span class="text-red-400">*</span></label>
+        <select name="account" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">Selecione uma conta…</option>
+          {% for acc in accounts %}
+          <option value="{{ acc.id }}">{{ acc.name }}{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">
+            Data de início <span class="text-red-400">*</span>
+          </label>
+          <input type="date" name="start_date" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">
+            Data de término
+            <span class="font-normal text-smoke/60 ml-0.5">— expira após</span>
+          </label>
+          <input type="date" name="end_date" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <button type="submit" class="w-full rounded-lg bg-obsidian py-3 text-sm font-black text-white transition-colors hover:bg-obsidian/90">
+        Criar lançamento fixo
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── Modal: Editar Fixo ─── -->
+<div id="modal-editar-fixo" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-black text-obsidian">Editar lançamento fixo</h2>
+        <p class="text-xs text-smoke mt-0.5">Entrada ou saída recorrente</p>
+      </div>
+      <button onclick="document.getElementById('modal-editar-fixo').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="form-editar-fixo" method="post" action="#" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Nome</label>
+        <input type="text" id="edit-fixo-name" name="name" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Tipo</label>
+          <select id="edit-fixo-type" name="type" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+            <option value="income">Entrada</option>
+            <option value="expense">Saída</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Valor (R$)</label>
+          <input type="number" id="edit-fixo-amount" name="amount" step="0.01" min="0.01" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Frequência</label>
+          <select id="edit-fixo-frequency" name="frequency" onchange="updateEditDayField()" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+            <option value="weekly">Semanal</option>
+            <option value="biweekly">Quinzenal</option>
+            <option value="monthly">Mensal</option>
+            <option value="quarterly">Trimestral</option>
+            <option value="semiannual">Semestral</option>
+            <option value="annual">Anual</option>
+          </select>
+        </div>
+        <div id="edit-fixo-day-week-wrap">
+          <label class="block text-xs font-semibold text-smoke">Dia da semana</label>
+          <select id="edit-fixo-day-week" name="day_of_week" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+            <option value="0">Segunda-feira</option>
+            <option value="1">Terça-feira</option>
+            <option value="2">Quarta-feira</option>
+            <option value="3">Quinta-feira</option>
+            <option value="4">Sexta-feira</option>
+            <option value="5">Sábado</option>
+            <option value="6">Domingo</option>
+          </select>
+        </div>
+        <div id="edit-fixo-day-month-wrap" class="hidden">
+          <label class="block text-xs font-semibold text-smoke">Dia do mês</label>
+          <input type="number" id="edit-fixo-day-month" name="day_of_month" min="1" max="28"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Categoria (opcional)</label>
+        <select id="edit-fixo-category" name="category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">Sem categoria</option>
+          <optgroup label="Entradas">
+            {% for cat in categories %}{% if cat.type == "income" %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endif %}{% endfor %}
+          </optgroup>
+          <optgroup label="Saídas">
+            {% for cat in categories %}{% if cat.type == "expense" %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endif %}{% endfor %}
+          </optgroup>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Conta <span class="text-red-400">*</span></label>
+        <select id="edit-fixo-account" name="account" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">Selecione uma conta…</option>
+          {% for acc in accounts %}
+          <option value="{{ acc.id }}">{{ acc.name }}{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Data de início <span class="text-red-400">*</span></label>
+          <input type="date" id="edit-fixo-start" name="start_date" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Data de término <span class="font-normal text-smoke/60">— expira após</span></label>
+          <input type="date" id="edit-fixo-end" name="end_date" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <button type="submit" class="w-full rounded-lg bg-obsidian py-3 text-sm font-black text-white transition-colors hover:bg-obsidian/90">
+        Salvar alterações
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── Modal: Editar Lançamento ─── -->
+<div id="modal-editar-tx" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="font-black text-obsidian">Editar lançamento</h2>
+      <button onclick="document.getElementById('modal-editar-tx').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="form-editar-tx" method="post" action="#" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Descrição</label>
+        <input type="text" id="edit-tx-description" name="description" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Valor (R$)</label>
+          <input type="number" id="edit-tx-amount" name="amount" step="0.01" min="0.01" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Data</label>
+          <input type="date" id="edit-tx-date" name="date" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Conta</label>
+        <select id="edit-tx-account" name="account" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          {% for acc in accounts %}
+          <option value="{{ acc.id }}">{{ acc.name }}{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Categoria (opcional)</label>
+        <select id="edit-tx-category" name="category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">Sem categoria</option>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}">{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if goals %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Meta (opcional)</label>
+        <select id="edit-tx-goal" name="goal" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="">— Nenhuma meta —</option>
+          {% for g in goals %}
+          <option value="{{ g.id }}">{{ g.name }} ({{ g.progress_percent }}%)</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <button type="submit" class="w-full rounded-lg bg-solve py-3 text-sm font-black text-white transition-colors hover:bg-solve-dark">
+        Salvar alterações
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── Modal: Nova Categoria ─── -->
+<div id="modal-nova-categoria" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-black text-obsidian">Nova categoria</h2>
+        <p class="text-xs text-smoke mt-0.5">Personalizada para entradas ou saídas</p>
+      </div>
+      <button onclick="document.getElementById('modal-nova-categoria').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'categoria_criar' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Nome</label>
+          <input type="text" name="name" required placeholder="Ex: Academia, Pet…"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Tipo</label>
+          <select name="type" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+            <option value="expense">Saída</option>
+            <option value="income">Entrada</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke mb-2">Ícone</label>
+        <div class="grid grid-cols-9 gap-1 rounded-xl border border-slate-100 bg-slate-50/70 p-2">
+          {% for icon_name in available_icons %}
+          <button type="button" data-icon="{{ icon_name }}" onclick="selectCatIcon(this)"
+                  class="cat-icon-btn flex items-center justify-center h-8 w-8 rounded-lg border border-transparent text-smoke/60 transition-colors hover:bg-white hover:text-obsidian hover:shadow-sm"
+                  title="{{ icon_name }}">
+            {% category_icon icon_name "h-4 w-4" %}
+          </button>
+          {% endfor %}
+        </div>
+        <input type="hidden" id="cat-icon-input" name="icon" value="tag">
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-smoke">Cor</label>
+          <input type="color" name="color" id="cat-color-input" value="#64748B"
+                 class="mt-1 h-10 w-full cursor-pointer rounded-lg border border-slate-200 p-1">
+        </div>
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-smoke">Pré-visualização</label>
+          <div class="mt-1 flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+            <div id="cat-preview-icon" class="flex h-7 w-7 items-center justify-center rounded-full" style="background-color:#64748B22; color:#64748B">
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+            </div>
+            <span id="cat-preview-name" class="text-sm text-smoke">Nome</span>
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="w-full rounded-lg bg-obsidian py-3 text-sm font-black text-white transition-colors hover:bg-obsidian/90">
+        Criar categoria
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+function updateDayField() {
+  var freq = document.getElementById('fixo-frequency').value;
+  var weekWrap = document.getElementById('fixo-day-week-wrap');
+  var monthWrap = document.getElementById('fixo-day-month-wrap');
+  var useWeek = freq === 'weekly' || freq === 'biweekly';
+  weekWrap.classList.toggle('hidden', !useWeek);
+  monthWrap.classList.toggle('hidden', useWeek);
+}
+// init on page load
+document.addEventListener('DOMContentLoaded', function() {
+  updateDayField();
+});
+
+function updateEditDayField() {
+  var freq = document.getElementById('edit-fixo-frequency').value;
+  var weekWrap = document.getElementById('edit-fixo-day-week-wrap');
+  var monthWrap = document.getElementById('edit-fixo-day-month-wrap');
+  var useWeek = freq === 'weekly' || freq === 'biweekly';
+  weekWrap.classList.toggle('hidden', !useWeek);
+  monthWrap.classList.toggle('hidden', useWeek);
+}
+
+function openEditFixo(pk, name, amount, type, frequency, startDate, accountPk, dayMonth, dayWeek, categoryPk, endDate) {
+  document.getElementById('form-editar-fixo').action = '/dashboard/fixos/' + pk + '/editar/';
+  document.getElementById('edit-fixo-name').value = name;
+  document.getElementById('edit-fixo-amount').value = amount;
+  document.getElementById('edit-fixo-type').value = type;
+  document.getElementById('edit-fixo-frequency').value = frequency;
+  document.getElementById('edit-fixo-start').value = startDate;
+  document.getElementById('edit-fixo-end').value = endDate || '';
+  document.getElementById('edit-fixo-account').value = accountPk || '';
+  document.getElementById('edit-fixo-category').value = categoryPk || '';
+  updateEditDayField();
+  if (frequency === 'weekly' || frequency === 'biweekly') {
+    document.getElementById('edit-fixo-day-week').value = dayWeek || '0';
+  } else {
+    document.getElementById('edit-fixo-day-month').value = dayMonth || '';
+  }
+  document.getElementById('modal-editar-fixo').classList.remove('hidden');
+}
+
+function selectCatIcon(btn) {
+  document.querySelectorAll('.cat-icon-btn').forEach(function(b) {
+    b.classList.remove('border-solve', 'bg-white', 'text-obsidian', 'shadow-sm');
+    b.classList.add('border-transparent', 'text-smoke/60');
+  });
+  btn.classList.remove('border-transparent', 'text-smoke/60');
+  btn.classList.add('border-solve', 'bg-white', 'text-obsidian', 'shadow-sm');
+  document.getElementById('cat-icon-input').value = btn.dataset.icon;
+  // update preview
+  var color = document.getElementById('cat-color-input').value;
+  var preview = document.getElementById('cat-preview-icon');
+  preview.style.backgroundColor = color + '22';
+  preview.style.color = color;
+  preview.innerHTML = btn.querySelector('svg').outerHTML;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var colorInput = document.getElementById('cat-color-input');
+  if (colorInput) {
+    colorInput.addEventListener('input', function() {
+      var color = this.value;
+      var preview = document.getElementById('cat-preview-icon');
+      preview.style.backgroundColor = color + '22';
+      preview.style.color = color;
+    });
+  }
+  var nameInput = document.querySelector('#modal-nova-categoria input[name="name"]');
+  if (nameInput) {
+    nameInput.addEventListener('input', function() {
+      document.getElementById('cat-preview-name').textContent = this.value || 'Nome';
+    });
+  }
+});
+
+function openEditTx(pk, description, amount, dateVal, type, accountPk, categoryPk, goalPk) {
+  document.getElementById('form-editar-tx').action = '/dashboard/lancamentos/' + pk + '/editar/';
+  document.getElementById('edit-tx-description').value = description;
+  document.getElementById('edit-tx-amount').value = amount;
+  document.getElementById('edit-tx-date').value = dateVal;
+  const accSel = document.getElementById('edit-tx-account');
+  if (accountPk) accSel.value = accountPk;
+  const catSel = document.getElementById('edit-tx-category');
+  catSel.value = categoryPk || '';
+  const goalSel = document.getElementById('edit-tx-goal');
+  if (goalSel) goalSel.value = goalPk || '';
+  document.getElementById('modal-editar-tx').classList.remove('hidden');
+}
+</script>
+
+{% endblock %}

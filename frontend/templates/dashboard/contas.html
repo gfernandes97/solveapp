@@ -1,0 +1,538 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% load finance_tags %}
+{% block title %}Contas{% endblock %}
+{% block header_title %}Contas{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Page header -->
+  <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-black tracking-tight text-obsidian">Contas</h1>
+      <p class="mt-0.5 text-sm text-smoke">Gerencie seus bancos, cartões e custódias. Clique em uma conta para ver o histórico de saldos.</p>
+    </div>
+    <button onclick="openModal('modal-nova-conta')"
+            class="inline-flex items-center gap-2 rounded-lg bg-solve px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-solve-dark self-start sm:self-auto">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Nova conta
+    </button>
+  </div>
+
+  {% if has_accounts %}
+
+  <!-- ── Contas bancárias e carteiras ── -->
+  {% if cash_accounts %}
+  <div class="space-y-3">
+    <p class="px-1 text-xs font-semibold uppercase tracking-wider text-smoke">Contas bancárias e carteiras</p>
+    {% for acc in cash_accounts %}
+    <div class="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <!-- Clickable main row -->
+      <div class="flex items-center gap-3 px-5 py-4">
+        <button type="button" onclick="toggleHistory({{ acc.id }})"
+                class="flex flex-1 items-center gap-4 min-w-0 text-left">
+          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-black text-white"
+               style="background-color:{{ acc.color }}">{{ acc.name.0|upper }}</div>
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold text-obsidian">{{ acc.name }}</p>
+            <div class="mt-0.5 flex items-center gap-2 flex-wrap">
+              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                {% if acc.type == 'checking' %}bg-signal/10 text-signal
+                {% elif acc.type == 'savings' %}bg-solve/10 text-solve
+                {% else %}bg-slate-100 text-smoke{% endif %}">{{ acc.get_type_display }}</span>
+              {% if acc.bank_name %}<span class="text-xs text-smoke">{{ acc.bank_name }}</span>{% endif %}
+              {% if not acc.is_active %}<span class="rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-400">Inativa</span>{% endif %}
+            </div>
+          </div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            {% if acc.latest_balance is not None %}
+            <p class="text-lg font-black {% if acc.latest_balance >= 0 %}text-obsidian{% else %}text-red-500{% endif %}">
+              R$&nbsp;{{ acc.latest_balance|brl }}
+            </p>
+            {% else %}
+            <p class="text-sm text-smoke/40 italic">Sem saldo</p>
+            {% endif %}
+            <svg id="chevron-{{ acc.id }}" class="h-4 w-4 text-smoke transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </div>
+        </button>
+        <!-- Action buttons (outside the toggle target) -->
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}')"
+                  class="rounded-lg p-1.5 text-smoke transition-colors hover:bg-solve/10 hover:text-solve" title="Registrar saldo do mês">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </button>
+          <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }})"
+                  class="rounded-lg p-1.5 text-smoke transition-colors hover:bg-slate-100 hover:text-obsidian" title="Editar">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <form method="post" action="{% url 'conta_excluir' acc.id %}" onsubmit="return confirm('Desativar a conta {{ acc.name|escapejs }}?')">
+            {% csrf_token %}
+            <button type="submit" class="rounded-lg p-1.5 text-smoke transition-colors hover:bg-red-50 hover:text-red-500" title="Desativar">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 115.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+      <!-- Expandable monthly history -->
+      <div id="history-{{ acc.id }}" class="hidden border-t border-slate-100">
+        {% with snaps=acc.monthly_snapshots.all %}
+        {% if snaps %}
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-slate-50 text-left text-xs text-smoke">
+            <th class="px-5 py-3 font-semibold">Mês</th>
+            <th class="px-5 py-3 text-right font-semibold">Saldo fechamento</th>
+            <th class="px-5 py-3 w-10"></th>
+          </tr></thead>
+          <tbody class="divide-y divide-slate-50">
+            {% for snap in snaps %}
+            <tr class="hover:bg-slate-50/50">
+              <td class="px-5 py-3 font-medium text-obsidian">{{ snap.month|date:"M/Y" }}</td>
+              <td class="px-5 py-3 text-right font-semibold {% if snap.balance >= 0 %}text-obsidian{% else %}text-red-500{% endif %}">R$&nbsp;{{ snap.balance|brl }}</td>
+              <td class="px-5 py-3 text-right">
+                <form method="post" action="{% url 'snapshot_excluir' snap.id %}" class="inline">
+                  {% csrf_token %}
+                  <button type="submit" class="text-smoke hover:text-red-400 transition-colors" title="Remover">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="flex flex-col items-center gap-2 px-5 py-6 text-center">
+          <p class="text-sm text-smoke">Nenhum saldo registrado ainda.</p>
+          <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}')"
+                  class="text-sm font-semibold text-solve hover:text-solve-dark transition-colors">
+            Registrar primeiro saldo
+          </button>
+        </div>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ── Cartões de crédito ── -->
+  {% if credit_accounts %}
+  <div class="space-y-3">
+    <p class="px-1 text-xs font-semibold uppercase tracking-wider text-smoke">Cartões de crédito</p>
+    {% for acc in credit_accounts %}
+    <div class="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div class="flex items-center gap-3 px-5 py-4">
+        <button type="button" onclick="toggleHistory({{ acc.id }})"
+                class="flex flex-1 items-center gap-4 min-w-0 text-left">
+          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-black text-white"
+               style="background-color:{{ acc.color }}">{{ acc.name.0|upper }}</div>
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold text-obsidian">{{ acc.name }}</p>
+            <div class="mt-0.5 flex items-center gap-2">
+              <span class="inline-flex rounded-full bg-solar/10 px-2 py-0.5 text-xs font-medium text-solar">Crédito</span>
+              {% if acc.bank_name %}<span class="text-xs text-smoke">{{ acc.bank_name }}</span>{% endif %}
+            </div>
+            {% if acc.closing_day %}<p class="mt-0.5 text-xs text-smoke">Fecha {{ acc.closing_day }} · Vence {{ acc.due_day }}</p>{% endif %}
+          </div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            {% if acc.latest_balance is not None %}
+            <div class="text-right">
+              <p class="text-lg font-black text-red-500">-R$&nbsp;{{ acc.latest_balance|brl }}</p>
+              {% if acc.credit_limit %}<p class="text-xs text-smoke">Limite R$&nbsp;{{ acc.credit_limit|brl }}</p>{% endif %}
+            </div>
+            {% else %}
+            <p class="text-sm text-smoke/40 italic">Sem fatura</p>
+            {% endif %}
+            <svg id="chevron-{{ acc.id }}" class="h-4 w-4 text-smoke transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </div>
+        </button>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}')"
+                  class="rounded-lg p-1.5 text-smoke transition-colors hover:bg-solve/10 hover:text-solve" title="Registrar fatura do mês">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </button>
+          <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }})"
+                  class="rounded-lg p-1.5 text-smoke transition-colors hover:bg-slate-100 hover:text-obsidian">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <form method="post" action="{% url 'conta_excluir' acc.id %}" onsubmit="return confirm('Desativar {{ acc.name|escapejs }}?')">
+            {% csrf_token %}
+            <button type="submit" class="rounded-lg p-1.5 text-smoke transition-colors hover:bg-red-50 hover:text-red-500">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 115.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+      <div id="history-{{ acc.id }}" class="hidden border-t border-slate-100">
+        {% with snaps=acc.monthly_snapshots.all %}
+        {% if snaps %}
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-slate-50 text-left text-xs text-smoke">
+            <th class="px-5 py-3 font-semibold">Mês</th>
+            <th class="px-5 py-3 text-right font-semibold">Fatura fechamento</th>
+            <th class="px-5 py-3 w-10"></th>
+          </tr></thead>
+          <tbody class="divide-y divide-slate-50">
+            {% for snap in snaps %}
+            <tr class="hover:bg-slate-50/50">
+              <td class="px-5 py-3 font-medium text-obsidian">{{ snap.month|date:"M/Y" }}</td>
+              <td class="px-5 py-3 text-right font-semibold text-red-500">R$&nbsp;{{ snap.balance|brl }}</td>
+              <td class="px-5 py-3 text-right">
+                <form method="post" action="{% url 'snapshot_excluir' snap.id %}" class="inline">
+                  {% csrf_token %}
+                  <button type="submit" class="text-smoke hover:text-red-400 transition-colors">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="flex flex-col items-center gap-2 px-5 py-6 text-center">
+          <p class="text-sm text-smoke">Nenhuma fatura registrada ainda.</p>
+          <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}')"
+                  class="text-sm font-semibold text-solve hover:text-solve-dark transition-colors">
+            Registrar primeira fatura
+          </button>
+        </div>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ── Custódias de investimento ── -->
+  {% if investment_accounts %}
+  <div class="space-y-3">
+    <p class="px-1 text-xs font-semibold uppercase tracking-wider text-smoke">Custódias de investimento</p>
+    {% for acc in investment_accounts %}
+    <div class="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div class="flex items-center gap-3 px-5 py-4">
+        <button type="button" onclick="toggleHistory({{ acc.id }})"
+                class="flex flex-1 items-center gap-4 min-w-0 text-left">
+          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-black text-white"
+               style="background-color:{{ acc.color }}">{{ acc.name.0|upper }}</div>
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold text-obsidian">{{ acc.name }}</p>
+            <div class="mt-0.5 flex items-center gap-2">
+              <span class="inline-flex rounded-full bg-signal/10 px-2 py-0.5 text-xs font-medium text-signal">Investimentos</span>
+              {% if acc.bank_name %}<span class="text-xs text-smoke">{{ acc.bank_name }}</span>{% endif %}
+            </div>
+          </div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            {% if acc.latest_balance is not None %}
+            <p class="text-lg font-black text-signal">R$&nbsp;{{ acc.latest_balance|brl }}</p>
+            {% else %}
+            <p class="text-sm text-smoke/40 italic">Sem valor</p>
+            {% endif %}
+            <svg id="chevron-{{ acc.id }}" class="h-4 w-4 text-smoke transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </div>
+        </button>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}')"
+                  class="rounded-lg p-1.5 text-smoke transition-colors hover:bg-solve/10 hover:text-solve" title="Registrar valor do mês">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </button>
+          <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }})"
+                  class="rounded-lg p-1.5 text-smoke transition-colors hover:bg-slate-100 hover:text-obsidian">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <form method="post" action="{% url 'conta_excluir' acc.id %}" onsubmit="return confirm('Desativar {{ acc.name|escapejs }}?')">
+            {% csrf_token %}
+            <button type="submit" class="rounded-lg p-1.5 text-smoke transition-colors hover:bg-red-50 hover:text-red-500">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 115.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+      <div id="history-{{ acc.id }}" class="hidden border-t border-slate-100">
+        {% with snaps=acc.monthly_snapshots.all %}
+        {% if snaps %}
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-slate-50 text-left text-xs text-smoke">
+            <th class="px-5 py-3 font-semibold">Mês</th>
+            <th class="px-5 py-3 text-right font-semibold">Valor da carteira</th>
+            <th class="px-5 py-3 w-10"></th>
+          </tr></thead>
+          <tbody class="divide-y divide-slate-50">
+            {% for snap in snaps %}
+            <tr class="hover:bg-slate-50/50">
+              <td class="px-5 py-3 font-medium text-obsidian">{{ snap.month|date:"M/Y" }}</td>
+              <td class="px-5 py-3 text-right font-semibold text-signal">R$&nbsp;{{ snap.balance|brl }}</td>
+              <td class="px-5 py-3 text-right">
+                <form method="post" action="{% url 'snapshot_excluir' snap.id %}" class="inline">
+                  {% csrf_token %}
+                  <button type="submit" class="text-smoke hover:text-red-400 transition-colors">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="flex flex-col items-center gap-2 px-5 py-6 text-center">
+          <p class="text-sm text-smoke">Nenhum valor registrado ainda.</p>
+          <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}')"
+                  class="text-sm font-semibold text-solve hover:text-solve-dark transition-colors">
+            Registrar primeiro valor
+          </button>
+        </div>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center">
+    <div class="flex h-14 w-14 items-center justify-center rounded-full bg-solve/10">
+      <svg class="h-7 w-7 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+    </div>
+    <div>
+      <p class="font-semibold text-obsidian">Adicione sua primeira conta</p>
+      <p class="mt-1 max-w-xs text-sm text-smoke">Conta corrente, poupança, cartão de crédito ou custódia de investimento.</p>
+    </div>
+    <button onclick="openModal('modal-nova-conta')"
+            class="inline-flex items-center gap-2 rounded-lg bg-solve px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-solve-dark">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Adicionar conta
+    </button>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ─── Modal: Nova Conta ─── -->
+<div id="modal-nova-conta" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="font-black text-obsidian">Nova conta</h2>
+      <button onclick="closeModal('modal-nova-conta')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'contas' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Nome da conta *</label>
+        <input type="text" name="name" required placeholder="Ex: Nubank, Itaú Corrente…"
+               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Tipo</label>
+          <select name="type" id="nc-type"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve"
+                  onchange="toggleCreditFields('nc-credit-fields', this.value)">
+            {% for value, label in account_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Banco / Instituição</label>
+          <input type="text" name="bank_name" placeholder="Ex: Nubank, XP…"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div id="nc-credit-fields" class="hidden grid grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Limite (R$)</label>
+          <input type="number" name="credit_limit" step="0.01" placeholder="0,00"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Fecha dia</label>
+          <input type="number" name="closing_day" min="1" max="31" placeholder="10"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Vence dia</label>
+          <input type="number" name="due_day" min="1" max="31" placeholder="17"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="include_in_total" id="nc-include" checked
+                 class="rounded border-slate-300 text-solve focus:ring-solve">
+          <label for="nc-include" class="text-sm text-smoke">Incluir no saldo total</label>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-smoke">Cor</label>
+          <input type="color" name="color" value="#00C97A"
+                 class="ml-2 h-8 w-10 cursor-pointer rounded border border-slate-200 p-0.5">
+        </div>
+      </div>
+      <p class="text-xs text-smoke/60 rounded-lg bg-slate-50 px-3 py-2">
+        Saldos são registrados mês a mês diretamente na conta — clique no ícone de calendário após criar.
+      </p>
+      <button type="submit" class="w-full rounded-lg bg-solve py-3 text-sm font-black text-white transition-colors hover:bg-solve-dark">
+        Adicionar conta
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── Modal: Editar Conta ─── -->
+<div id="modal-editar-conta" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="font-black text-obsidian">Editar conta</h2>
+      <button onclick="closeModal('modal-editar-conta')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="edit-conta-form" method="post" action="" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Nome da conta *</label>
+        <input type="text" id="ec-name" name="name" required
+               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Tipo</label>
+          <select id="ec-type" name="type"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve"
+                  onchange="toggleCreditFields('ec-credit-fields', this.value)">
+            {% for value, label in account_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Banco / Instituição</label>
+          <input type="text" id="ec-bank" name="bank_name"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div id="ec-credit-fields" class="hidden grid grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Limite (R$)</label>
+          <input type="number" name="credit_limit" step="0.01"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Fecha dia</label>
+          <input type="number" name="closing_day" min="1" max="31"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Vence dia</label>
+          <input type="number" name="due_day" min="1" max="31"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <label class="flex items-center gap-2 text-sm text-smoke">
+            <input type="checkbox" id="ec-include" name="include_in_total" class="rounded border-slate-300 text-solve focus:ring-solve">
+            Incluir no total
+          </label>
+          <label class="flex items-center gap-2 text-sm text-smoke">
+            <input type="checkbox" id="ec-active" name="is_active" class="rounded border-slate-300 text-solve focus:ring-solve">
+            Ativa
+          </label>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-smoke">Cor</label>
+          <input type="color" id="ec-color" name="color"
+                 class="ml-2 h-8 w-10 cursor-pointer rounded border border-slate-200 p-0.5">
+        </div>
+      </div>
+      <button type="submit" class="w-full rounded-lg bg-obsidian py-3 text-sm font-black text-white transition-colors hover:bg-obsidian/90">
+        Salvar alterações
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── Modal: Registrar Saldo do Mês ─── -->
+<div id="modal-snapshot" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-black text-obsidian">Registrar saldo</h2>
+        <p id="snapshot-account-name" class="text-xs text-smoke mt-0.5"></p>
+      </div>
+      <button onclick="closeModal('modal-snapshot')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'snapshot_criar' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" id="snapshot-account-id" name="account" value="">
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Mês de referência</label>
+        <input type="month" id="snapshot-month" name="month" required
+               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Saldo no fechamento (R$)</label>
+        <input type="number" name="balance" step="0.01" placeholder="0,00" required
+               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Observação (opcional)</label>
+        <input type="text" name="notes" placeholder="Ex: rendimento, aporte…"
+               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <p class="text-xs text-smoke/60">Se já existe uma entrada para este mês, o valor será substituído.</p>
+      <button type="submit" class="w-full rounded-lg bg-solve py-3 text-sm font-black text-white transition-colors hover:bg-solve-dark">
+        Salvar saldo
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function toggleCreditFields(id, type) {
+  document.getElementById(id).classList.toggle('hidden', type !== 'credit');
+}
+
+function toggleHistory(accountId) {
+  const panel = document.getElementById('history-' + accountId);
+  const chevron = document.getElementById('chevron-' + accountId);
+  const isHidden = panel.classList.toggle('hidden');
+  chevron.style.transform = isHidden ? '' : 'rotate(180deg)';
+}
+
+function openEditConta(id, name, type, bank, color, includeInTotal, isActive) {
+  const form = document.getElementById('edit-conta-form');
+  form.action = `/dashboard/contas/${id}/editar/`;
+  document.getElementById('ec-name').value = name;
+  document.getElementById('ec-type').value = type;
+  document.getElementById('ec-bank').value = bank;
+  document.getElementById('ec-color').value = color;
+  document.getElementById('ec-include').checked = includeInTotal;
+  document.getElementById('ec-active').checked = isActive;
+  toggleCreditFields('ec-credit-fields', type);
+  openModal('modal-editar-conta');
+}
+
+function openSnapshotModal(accountId, accountName) {
+  document.getElementById('snapshot-account-id').value = accountId;
+  document.getElementById('snapshot-account-name').textContent = accountName;
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  document.getElementById('snapshot-month').value = `${y}-${m}`;
+  openModal('modal-snapshot');
+}
+</script>
+{% endblock %}

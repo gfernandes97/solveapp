@@ -1,0 +1,611 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}Projeção{% endblock %}
+{% block header_title %}Projeção{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <!-- ─── Header row: title + view toggle ─── -->
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-black tracking-tight text-obsidian">Projeção de Fluxo de Caixa</h1>
+      <p class="mt-0.5 text-sm text-smoke">Histórico real e projeção futura mês a mês</p>
+    </div>
+
+    <!-- View toggle -->
+    <div class="flex flex-shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+      <a href="?n_past={{ n_past }}&n={{ n_future }}&view=table"
+         class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors
+                {% if view_mode == 'table' %}bg-obsidian text-white shadow-sm{% else %}text-smoke hover:text-obsidian{% endif %}">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M3 10h18M3 14h18M3 6h18M3 18h18"/>
+        </svg>
+        Tabela
+      </a>
+      <a href="?n_past={{ n_past }}&n={{ n_future }}&view=chart"
+         class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors
+                {% if view_mode == 'chart' %}bg-obsidian text-white shadow-sm{% else %}text-smoke hover:text-obsidian{% endif %}">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        Gráfico
+      </a>
+    </div>
+  </div>
+
+  <!-- ─── Controls bar ─── -->
+  <form method="get"
+        class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-slate-100 bg-white px-5 py-4 shadow-sm">
+    <input type="hidden" name="view" value="{{ view_mode }}">
+
+    <div class="flex items-center gap-2 text-sm">
+      <label class="font-medium text-smoke">Ver</label>
+      <input type="number" name="n_past" value="{{ n_past }}" min="1" max="60"
+             class="w-14 rounded-lg border border-slate-200 px-2 py-1.5 text-center text-sm font-bold text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      <span class="text-smoke">meses para trás</span>
+    </div>
+
+    <span class="hidden text-slate-200 sm:block">|</span>
+
+    <div class="flex items-center gap-2 text-sm">
+      <input type="number" name="n" value="{{ n_future }}" min="1" max="60"
+             class="w-14 rounded-lg border border-slate-200 px-2 py-1.5 text-center text-sm font-bold text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      <span class="text-smoke">meses para frente</span>
+    </div>
+
+    <button type="submit"
+            class="ml-auto rounded-lg bg-obsidian px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-obsidian/90">
+      Aplicar
+    </button>
+  </form>
+
+  <!-- ─── KPI cards ─── -->
+  <div class="grid gap-4 sm:grid-cols-3">
+    <div class="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-wider text-smoke">Saldo hoje</p>
+      <p class="mt-2 text-2xl font-black {% if anchor >= 0 %}text-obsidian{% else %}text-red-500{% endif %}">
+        R$&nbsp;{{ anchor|brl }}
+      </p>
+      <p class="mt-1 text-xs text-smoke/60">Soma de todas as contas</p>
+    </div>
+    <div class="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-wider text-smoke">Resultado fixo / mês</p>
+      <p class="mt-2 text-2xl font-black {% if proj_net_monthly >= 0 %}text-solve{% else %}text-red-500{% endif %}">
+        {% if proj_net_monthly >= 0 %}+{% endif %}R$&nbsp;{{ proj_net_monthly|brl }}
+      </p>
+      <p class="mt-1 text-xs text-smoke/60">Recorrentes: entradas − saídas</p>
+    </div>
+    <div class="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-wider text-smoke">Saldo projetado em {{ n_future }}m</p>
+      <p class="mt-2 text-2xl font-black {% if proj_balance_n >= 0 %}text-signal{% else %}text-red-500{% endif %}">
+        R$&nbsp;{{ proj_balance_n|brl }}
+      </p>
+      <p class="mt-1 text-xs text-smoke/60">Fixos + variáveis registrados</p>
+    </div>
+  </div>
+
+  <!-- ─── Legenda ─── -->
+  <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-smoke">
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block h-2.5 w-2.5 rounded-sm bg-slate-300"></span>
+      Histórico real
+    </span>
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block h-2.5 w-2.5 rounded-sm bg-obsidian"></span>
+      Mês atual
+    </span>
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block h-2.5 w-2.5 rounded-sm border border-signal/40 bg-signal/20"></span>
+      Projeção (fixos cadastrados)
+    </span>
+    <span class="ml-auto italic opacity-70">* Variáveis futuras incluídas quando registradas</span>
+  </div>
+
+  <!-- ════════════════════════════════════
+       TABELA
+  ════════════════════════════════════ -->
+  {% if view_mode == 'table' %}
+
+  {% if warnings_count %}
+  <!-- ─── Batimento warnings ─── -->
+  <div class="rounded-xl border border-solar/30 bg-solar/5 px-5 py-4">
+    <div class="flex items-start gap-3">
+      <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-solar" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+      </svg>
+      <div>
+        <p class="font-semibold text-obsidian">Pendência de lançamentos detectada</p>
+        <p class="mt-0.5 text-sm text-smoke">
+          {{ warnings_count }} {% if warnings_count == 1 %}mês tem{% else %}meses têm{% endif %} saldo registrado que não bate com os lançamentos. Registre o ajuste abaixo para corrigir.
+        </p>
+      </div>
+    </div>
+
+    <div class="mt-4 space-y-5">
+      {% for row in rows %}{% if row.batimento_ok == False %}
+      {% for issue in row.batimento_issues %}
+      <div>
+        <p class="mb-2 text-xs font-semibold text-smoke uppercase tracking-wider">
+          {{ row.label }} · {{ issue.account_name }}
+          <span class="ml-1 font-normal normal-case text-smoke/60">
+            — saldo difere em
+            <span class="{% if issue.batimento_diff >= 0 %}text-solve{% else %}text-red-500{% endif %} font-semibold">
+              {% if issue.batimento_diff >= 0 %}+{% endif %}R$&nbsp;{{ issue.batimento_diff|brl }}
+            </span>
+            dos lançamentos
+          </span>
+        </p>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+          <!-- Opção: Entrada -->
+          <button type="button"
+                  onclick="openAjusteModal('credit','{{ issue.batimento_abs }}',{{ row.month|date:'Y' }},{{ row.month|date:'n' }},'{{ row.label|escapejs }}',{{ issue.account_id }})"
+                  class="group flex items-start gap-3 rounded-xl border-2 border-solve/40 bg-white p-4 text-left shadow-sm transition-all hover:border-solve hover:bg-solve/5 hover:shadow-md">
+            <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-solve/10 text-solve transition-colors group-hover:bg-solve group-hover:text-white">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 11l5-5m0 0l5 5m-5-5v12"/></svg>
+            </span>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-solve">Registrar entrada</p>
+              <p class="mt-0.5 text-xl font-black text-obsidian">R$&nbsp;{{ issue.batimento_abs|brl }}</p>
+              <p class="mt-0.5 text-xs text-smoke">{{ issue.account_name }} · {{ row.label }} · Cobre receita não registrada</p>
+            </div>
+          </button>
+
+          <!-- Opção: Saída -->
+          <button type="button"
+                  onclick="openAjusteModal('debit','{{ issue.batimento_abs }}',{{ row.month|date:'Y' }},{{ row.month|date:'n' }},'{{ row.label|escapejs }}',{{ issue.account_id }})"
+                  class="group flex items-start gap-3 rounded-xl border-2 border-red-300 bg-white p-4 text-left shadow-sm transition-all hover:border-red-500 hover:bg-red-50 hover:shadow-md">
+            <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-400 transition-colors group-hover:bg-red-500 group-hover:text-white">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 13l-5 5m0 0l-5-5m5 5V6"/></svg>
+            </span>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-red-500">Registrar saída</p>
+              <p class="mt-0.5 text-xl font-black text-obsidian">R$&nbsp;{{ issue.batimento_abs|brl }}</p>
+              <p class="mt-0.5 text-xs text-smoke">{{ issue.account_name }} · {{ row.label }} · Cobre despesa não registrada</p>
+            </div>
+          </button>
+
+        </div>
+      </div>
+      {% endfor %}
+      {% endif %}{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+    <table class="min-w-full border-collapse text-sm">
+
+      <thead>
+        <tr class="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-smoke">
+          <th class="sticky left-0 z-10 bg-slate-50 px-4 py-3 text-left" rowspan="2">Período</th>
+          <th class="border-l border-slate-100 px-3 py-2 text-center text-solve" colspan="3">Entradas</th>
+          <th class="border-l border-slate-100 px-3 py-2 text-center text-red-400" colspan="3">Saídas</th>
+          <th class="border-l border-slate-100 px-3 py-2 text-center text-obsidian" colspan="3">Resultado</th>
+          <th class="border-l border-slate-100 px-3 py-3 text-right" rowspan="2">Saldo Final</th>
+        </tr>
+        <tr class="border-b-2 border-slate-200 bg-slate-50 text-xs text-smoke/60">
+          <th class="border-l border-slate-100 px-3 py-2 text-right font-medium">Fixas</th>
+          <th class="px-3 py-2 text-right font-medium">Variáveis</th>
+          <th class="px-3 py-2 text-right font-semibold text-solve">Total</th>
+          <th class="border-l border-slate-100 px-3 py-2 text-right font-medium">Fixas</th>
+          <th class="px-3 py-2 text-right font-medium">Variáveis</th>
+          <th class="px-3 py-2 text-right font-semibold text-red-400">Total</th>
+          <th class="border-l border-slate-100 px-3 py-2 text-right font-medium">Caixa</th>
+          <th class="px-3 py-2 text-right font-medium">Investimentos</th>
+          <th class="px-3 py-2 text-right font-semibold">Total</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for row in rows %}
+
+        {% if row.is_past %}
+        <tr class="border-b border-slate-50 text-slate-400 transition-colors hover:bg-slate-50/70">
+          <td class="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-slate-400 hover:bg-slate-50/70">
+            <span class="whitespace-nowrap">{{ row.label }}</span>
+            <span class="ml-1.5 inline-block rounded px-1 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-400">Real</span>
+            {% if row.batimento_ok == False %}
+            <span class="ml-1 inline-flex items-center gap-0.5 rounded bg-solar/15 px-1 py-0.5 text-[10px] font-bold text-solar"
+                  title="{% for i in row.batimento_issues %}{{ i.account_name }}: R${{ i.batimento_abs|brl }}{% if not forloop.last %} | {% endif %}{% endfor %}">⚠ batimento</span>
+            {% endif %}
+          </td>
+          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums">{{ row.fixed_income|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums">{{ row.var_income|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums font-semibold {% if row.total_income > 0 %}text-solve/60{% endif %}">{{ row.total_income|brl }}</td>
+          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums">{{ row.fixed_expense|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums">{{ row.var_expense|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums font-semibold {% if row.total_expense > 0 %}text-red-300{% endif %}">{{ row.total_expense|brl }}</td>
+          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums font-bold {% if row.net >= 0 %}text-solve/50{% else %}text-red-300{% endif %}">
+            {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
+          </td>
+          <td class="px-3 py-3 text-right tabular-nums text-slate-300">
+            {% if row.inv_result is not None %}
+              <span class="{% if row.inv_result >= 0 %}text-signal/50{% else %}text-red-300{% endif %}">
+                {% if row.inv_result >= 0 %}+{% endif %}{{ row.inv_result|brl }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-3 py-3 text-right tabular-nums font-semibold text-slate-400">
+            {% if row.result_total is not None %}
+              <span class="{% if row.result_total >= 0 %}text-solve/50{% else %}text-red-300{% endif %}">
+                {% if row.result_total >= 0 %}+{% endif %}{{ row.result_total|brl }}
+              </span>
+            {% elif row.inv_result is None %}
+              <span class="{% if row.net >= 0 %}text-solve/50{% else %}text-red-300{% endif %}">
+                {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums font-semibold {% if row.batimento_ok == False %}bg-solar/5 text-solar{% else %}text-slate-400{% endif %}">
+            {{ row.end_balance|brl }}
+            {% if row.cash_snap is not None %}<span class="ml-0.5 text-[9px] text-slate-300" title="Saldo registrado">●</span>{% endif %}
+          </td>
+        </tr>
+
+        {% elif row.is_current %}
+        <tr class="border-y-2 border-obsidian bg-obsidian text-white">
+          <td class="sticky left-0 z-10 bg-obsidian px-4 py-4 font-black">
+            <span class="whitespace-nowrap">{{ row.label }}</span>
+            <span class="ml-1.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-black bg-solve text-white">Atual</span>
+            {% if row.batimento_ok == False %}
+            <span class="ml-1 inline-flex items-center gap-0.5 rounded bg-solar/30 px-1 py-0.5 text-[10px] font-bold text-solar"
+                  title="{% for i in row.batimento_issues %}{{ i.account_name }}: R${{ i.batimento_abs|brl }}{% if not forloop.last %} | {% endif %}{% endfor %}">⚠ batimento</span>
+            {% endif %}
+          </td>
+          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums text-white/70">{{ row.fixed_income|brl }}</td>
+          <td class="px-3 py-4 text-right tabular-nums text-white/70">{{ row.var_income|brl }}</td>
+          <td class="px-3 py-4 text-right tabular-nums font-bold text-solve">{{ row.total_income|brl }}</td>
+          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums text-white/70">{{ row.fixed_expense|brl }}</td>
+          <td class="px-3 py-4 text-right tabular-nums text-white/70">{{ row.var_expense|brl }}</td>
+          <td class="px-3 py-4 text-right tabular-nums font-bold text-red-400">{{ row.total_expense|brl }}</td>
+          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums font-black text-lg {% if row.net >= 0 %}text-solve{% else %}text-red-400{% endif %}">
+            {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
+          </td>
+          <td class="px-3 py-4 text-right tabular-nums text-white/50">
+            {% if row.inv_result is not None %}
+              <span class="{% if row.inv_result >= 0 %}text-signal{% else %}text-red-400{% endif %}">
+                {% if row.inv_result >= 0 %}+{% endif %}{{ row.inv_result|brl }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-3 py-4 text-right tabular-nums font-black text-lg {% if row.result_total is not None %}{% if row.result_total >= 0 %}text-solve{% else %}text-red-400{% endif %}{% elif row.net >= 0 %}text-solve{% else %}text-red-400{% endif %}">
+            {% if row.result_total is not None %}
+              {% if row.result_total >= 0 %}+{% endif %}{{ row.result_total|brl }}
+            {% else %}
+              {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
+            {% endif %}
+          </td>
+          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums font-black text-lg {% if row.batimento_ok == False %}text-solar{% else %}text-white{% endif %}">
+            {{ row.end_balance|brl }}
+            {% if row.cash_snap is not None %}<span class="ml-0.5 text-[9px] text-white/30" title="Saldo registrado">●</span>{% endif %}
+          </td>
+        </tr>
+
+        {% else %}
+        <tr class="border-b border-signal/10 bg-signal/[0.03] transition-colors hover:bg-signal/[0.07]">
+          <td class="sticky left-0 z-10 bg-signal/[0.03] px-4 py-3 font-medium text-obsidian hover:bg-signal/[0.07]">
+            <span class="whitespace-nowrap">{{ row.label }}</span>
+            <span class="ml-1.5 inline-block rounded px-1 py-0.5 text-[10px] font-semibold bg-signal/15 text-signal">Proj.</span>
+          </td>
+          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums text-obsidian/60 italic">{{ row.fixed_income|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums {% if row.var_income %}text-obsidian/80{% else %}text-smoke/40 italic{% endif %}">
+            {% if row.var_income %}{{ row.var_income|brl }}{% else %}—{% endif %}
+          </td>
+          <td class="px-3 py-3 text-right tabular-nums font-semibold text-solve">{{ row.total_income|brl }}</td>
+          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums text-obsidian/60 italic">{{ row.fixed_expense|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums {% if row.var_expense %}text-obsidian/80{% else %}text-smoke/40 italic{% endif %}">
+            {% if row.var_expense %}{{ row.var_expense|brl }}{% else %}—{% endif %}
+          </td>
+          <td class="px-3 py-3 text-right tabular-nums font-semibold text-red-400">{{ row.total_expense|brl }}</td>
+          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums font-bold {% if row.net >= 0 %}text-solve{% else %}text-red-500{% endif %}">
+            {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
+          </td>
+          <td class="px-3 py-3 text-right tabular-nums text-smoke/40 italic">—</td>
+          <td class="px-3 py-3 text-right tabular-nums font-bold {% if row.net >= 0 %}text-solve{% else %}text-red-500{% endif %}">
+            {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
+          </td>
+          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums font-bold {% if row.end_balance >= 0 %}text-signal{% else %}text-red-500{% endif %}">
+            {{ row.end_balance|brl }}
+          </td>
+        </tr>
+        {% endif %}
+
+        {% empty %}
+        <tr>
+          <td colspan="11" class="px-4 py-12 text-center text-sm text-smoke">
+            Nenhum dado encontrado. Adicione contas e lançamentos para começar.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ════════════════════════════════════
+       GRÁFICO
+  ════════════════════════════════════ -->
+  {% else %}
+  <div class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+    <div class="mb-5 flex flex-wrap items-center gap-5 text-xs text-smoke">
+      <span class="flex items-center gap-1.5">
+        <span class="inline-block h-3 w-3 rounded-sm" style="background:rgba(0,201,122,0.75)"></span>
+        Entradas
+      </span>
+      <span class="flex items-center gap-1.5">
+        <span class="inline-block h-3 w-3 rounded-sm" style="background:rgba(239,68,68,0.75)"></span>
+        Saídas
+      </span>
+      <span class="flex items-center gap-1.5">
+        <span class="inline-block h-3 w-0.5" style="background:#2563EB"></span>
+        <span class="inline-block h-3 w-0.5 ml-0.5" style="background:#2563EB"></span>
+        <span class="ml-1">Saldo Final</span>
+      </span>
+      <span class="ml-auto italic opacity-60">Barras claras = projeção</span>
+    </div>
+    <div class="relative h-[420px]">
+      <canvas id="flowChart"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
+  <p class="text-center text-xs text-smoke/40">
+    Projeções baseadas nos lançamentos fixos (recorrentes) cadastrados.
+    Saldo final ancorado nos registros mensais de saldo das custódias · <span class="font-medium">●</span> indica mês com saldo registrado.
+  </p>
+
+</div>
+
+<!-- ─── Modal: Registrar ajuste de batimento ─── -->
+<div id="modal-ajuste" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-black text-obsidian">Registrar ajuste</h2>
+        <p id="ajuste-tipo-label" class="mt-0.5 text-xs font-semibold text-solve">Entrada</p>
+      </div>
+      <button onclick="closeAjusteModal()" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'lancamentos' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" id="ajuste-tx-type" name="tx_type" value="credit">
+      <input type="hidden" name="redirect_to" value="projecao">
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Descrição</label>
+        <input type="text" id="ajuste-description" name="description" required
+               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Valor (R$) *</label>
+          <input type="number" id="ajuste-amount" name="amount" step="0.01" min="0.01" required
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Data *</label>
+          <input type="date" id="ajuste-date" name="date" required
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Custódia *</label>
+        <select id="ajuste-account" name="account" required
+                class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          {% for acc in cash_accounts %}
+          <option value="{{ acc.id }}">{{ acc.name }}{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <p class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-smoke/60">
+        O lançamento será registrado nas <a href="{% url 'lancamentos' %}" class="underline">Entradas/Saídas</a> e atualizará o batimento automaticamente.
+      </p>
+      <button type="submit" id="ajuste-submit-btn"
+              class="w-full rounded-lg bg-solve py-3 text-sm font-black text-white transition-colors hover:bg-solve-dark">
+        Registrar entrada
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+function openAjusteModal(type, amount, year, month, label, accountId) {
+  const isCredit = type === 'credit';
+  document.getElementById('ajuste-tx-type').value = type;
+  document.getElementById('ajuste-amount').value = amount;
+
+  // Last day of the given month
+  const lastDay = new Date(year, month, 0).getDate();
+  const mm = String(month).padStart(2, '0');
+  const dd = String(lastDay).padStart(2, '0');
+  document.getElementById('ajuste-date').value = `${year}-${mm}-${dd}`;
+  document.getElementById('ajuste-description').value = `Ajuste de batimento – ${label}`;
+
+  // Pre-select the specific account that caused the discrepancy
+  if (accountId) {
+    document.getElementById('ajuste-account').value = String(accountId);
+  }
+
+  const tipoLabel = document.getElementById('ajuste-tipo-label');
+  tipoLabel.textContent = isCredit ? 'Entrada' : 'Saída';
+  tipoLabel.className = isCredit
+    ? 'mt-0.5 text-xs font-semibold text-solve'
+    : 'mt-0.5 text-xs font-semibold text-red-500';
+
+  const btn = document.getElementById('ajuste-submit-btn');
+  btn.textContent = isCredit ? 'Registrar entrada' : 'Registrar saída';
+  btn.className = isCredit
+    ? 'w-full rounded-lg bg-solve py-3 text-sm font-black text-white transition-colors hover:bg-solve-dark'
+    : 'w-full rounded-lg bg-red-500 py-3 text-sm font-black text-white transition-colors hover:bg-red-600';
+
+  document.getElementById('modal-ajuste').classList.remove('hidden');
+}
+function closeAjusteModal() {
+  document.getElementById('modal-ajuste').classList.add('hidden');
+}
+// Close on backdrop click
+document.getElementById('modal-ajuste').addEventListener('click', function(e) {
+  if (e.target === this) closeAjusteModal();
+});
+</script>
+
+{% if view_mode == 'chart' %}
+<script>
+(function () {
+  const raw = {{ chart_data|safe }};
+
+  const SOLVE    = '#00C97A';
+  const RED      = '#EF4444';
+  const SIGNAL   = '#2563EB';
+  const OBSIDIAN = '#0F172A';
+
+  // Per-point opacity based on period type
+  function incomeColor(t) {
+    if (t === 'current') return 'rgba(0,201,122,0.95)';
+    if (t === 'future')  return 'rgba(0,201,122,0.28)';
+    return 'rgba(0,201,122,0.60)';
+  }
+  function expenseColor(t) {
+    if (t === 'current') return 'rgba(239,68,68,0.95)';
+    if (t === 'future')  return 'rgba(239,68,68,0.28)';
+    return 'rgba(239,68,68,0.60)';
+  }
+  function balanceBorderColor(t) {
+    if (t === 'current') return SOLVE;
+    if (t === 'future')  return 'rgba(37,99,235,0.55)';
+    return 'rgba(100,116,139,0.80)';
+  }
+  function balancePointColor(t) {
+    if (t === 'current') return SOLVE;
+    if (t === 'future')  return SIGNAL;
+    return '#94A3B8';
+  }
+  function balanceRadius(t) {
+    return t === 'current' ? 8 : 4;
+  }
+
+  const chart = new Chart(document.getElementById('flowChart'), {
+    type: 'bar',
+    data: {
+      labels: raw.labels,
+      datasets: [
+        {
+          label: 'Entradas',
+          data: raw.income,
+          backgroundColor: raw.types.map(incomeColor),
+          borderRadius: 5,
+          borderSkipped: false,
+          order: 2,
+        },
+        {
+          label: 'Saídas',
+          data: raw.expense,
+          backgroundColor: raw.types.map(expenseColor),
+          borderRadius: 5,
+          borderSkipped: false,
+          order: 3,
+        },
+        {
+          type: 'line',
+          label: 'Saldo Final',
+          data: raw.balance,
+          borderWidth: 2.5,
+          pointBackgroundColor: raw.types.map(balancePointColor),
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: raw.types.map(balanceRadius),
+          pointHoverRadius: raw.types.map(t => balanceRadius(t) + 2),
+          fill: false,
+          tension: 0.35,
+          order: 1,
+          // segment styling: solid for real, dashed for future
+          segment: {
+            borderColor: (ctx) => balanceBorderColor(raw.types[ctx.p0DataIndex]),
+            borderDash:  (ctx) => raw.types[ctx.p0DataIndex] === 'future' ? [6, 4] : [],
+          },
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: OBSIDIAN,
+          titleColor: '#fff',
+          bodyColor: 'rgba(255,255,255,0.75)',
+          padding: 12,
+          cornerRadius: 10,
+          callbacks: {
+            title: (items) => {
+              const idx = items[0].dataIndex;
+              const tag = raw.types[idx] === 'current' ? ' ★ Atual'
+                        : raw.types[idx] === 'future'  ? ' · Projeção'
+                        : ' · Real';
+              return raw.labels[idx] + tag;
+            },
+            label: (ctx) => {
+              const v = ctx.parsed.y;
+              const fmt = (n) => 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+              return `  ${ctx.dataset.label}: ${fmt(v)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#94A3B8', font: { size: 11 } },
+        },
+        y: {
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          ticks: {
+            color: '#94A3B8',
+            font: { size: 11 },
+            callback: (v) => {
+              if (Math.abs(v) >= 1000)
+                return 'R$ ' + (v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'k';
+              return 'R$ ' + v.toLocaleString('pt-BR');
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // Draw a vertical "today" line on current month bar
+  const currentIdx = raw.types.indexOf('current');
+  if (currentIdx >= 0) {
+    const plugin = {
+      id: 'currentLine',
+      afterDraw(chart) {
+        const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+        const xPos = x.getPixelForValue(currentIdx);
+        ctx.save();
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = 'rgba(0,201,122,0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(xPos, top);
+        ctx.lineTo(xPos, bottom);
+        ctx.stroke();
+        ctx.restore();
+      },
+    };
+    chart.config.plugins = [...(chart.config.plugins || []), plugin];
+    chart.update();
+  }
+})();
+</script>
+{% endif %}
+
+{% endblock %}

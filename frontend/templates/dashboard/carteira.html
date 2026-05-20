@@ -1,0 +1,349 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}Carteira{% endblock %}
+{% block header_title %}Carteira{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-black tracking-tight text-obsidian">Carteira</h1>
+      <p class="mt-0.5 text-sm text-smoke">Patrimônio consolidado — caixa e ativos</p>
+    </div>
+    <div class="flex gap-2 self-start sm:self-auto">
+      <button onclick="document.getElementById('modal-novo-investimento').classList.remove('hidden')"
+              class="inline-flex items-center gap-2 rounded-lg bg-signal px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-signal/90">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Novo investimento
+      </button>
+      <a href="{% url 'contas' %}" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-obsidian shadow-sm transition-colors hover:bg-slate-50">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+        </svg>
+        Contas
+      </a>
+    </div>
+  </div>
+
+  <!-- Patrimônio total hero -->
+  <div class="relative overflow-hidden rounded-2xl bg-obsidian px-6 py-8 shadow-lg">
+    <div class="pointer-events-none absolute inset-0 opacity-[0.03]"
+         style="background-image:linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px);background-size:32px 32px"></div>
+    <div class="relative">
+      <p class="text-sm font-medium text-white/50">Patrimônio total</p>
+      <p class="mt-2 font-black tracking-tight leading-none"><span class="text-2xl font-medium text-white/40">R$&nbsp;</span><span class="text-5xl text-white">{{ patrimonio|brl }}</span></p>
+    </div>
+    <div class="relative mt-6 flex flex-wrap gap-8 border-t border-white/10 pt-5">
+      <div>
+        <p class="text-xs text-white/40">Caixa</p>
+        <p class="mt-0.5 text-xl font-bold text-white">R$&nbsp;{{ cash_balance|brl }}</p>
+      </div>
+      <div>
+        <p class="text-xs text-white/40">Investimentos</p>
+        <p class="mt-0.5 text-xl font-bold text-white">R$&nbsp;{{ inv_total|brl }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Caixa + Investimentos -->
+  <div class="grid gap-6 lg:grid-cols-2">
+
+    <!-- Caixa (contas bancárias) -->
+    <div class="rounded-xl border border-slate-100 bg-white shadow-sm">
+      <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        <h3 class="font-semibold text-obsidian">Caixa</h3>
+        <a href="{% url 'contas' %}" class="text-xs font-medium text-solve hover:text-solve-dark transition-colors">Gerenciar</a>
+      </div>
+
+      {% if cash_accounts %}
+        <ul class="divide-y divide-slate-50">
+          {% for acc in cash_accounts %}
+          <li class="flex items-center justify-between px-5 py-3.5">
+            <div class="flex items-center gap-3">
+              <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                   style="background-color:{{ acc.color }}">
+                {{ acc.name.0|upper }}
+              </div>
+              <div>
+                <p class="text-sm font-medium text-obsidian">{{ acc.name }}</p>
+                <p class="text-xs text-smoke">{{ acc.get_type_display }}{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</p>
+              </div>
+            </div>
+            <p class="text-sm font-bold {% if acc.balance >= 0 %}text-obsidian{% else %}text-red-500{% endif %}">
+              R$&nbsp;{{ acc.balance|brl }}
+            </p>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="flex items-center justify-between border-t border-slate-100 px-5 py-3">
+          <p class="text-xs font-medium text-smoke">Total caixa</p>
+          <p class="text-sm font-black text-obsidian">R$&nbsp;{{ cash_balance|brl }}</p>
+        </div>
+      {% else %}
+        <div class="flex flex-col items-center gap-3 px-5 py-10 text-center">
+          <div class="flex h-12 w-12 items-center justify-center rounded-full bg-solve/10">
+            <svg class="h-6 w-6 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+            </svg>
+          </div>
+          <p class="text-sm font-medium text-obsidian">Nenhuma conta cadastrada</p>
+          <a href="{% url 'contas' %}" class="text-sm font-semibold text-solve hover:text-solve-dark transition-colors">Adicionar conta</a>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Investimentos por classe -->
+    <div class="rounded-xl border border-slate-100 bg-white shadow-sm">
+      <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        <h3 class="font-semibold text-obsidian">Investimentos</h3>
+        <span class="text-xs text-smoke">por classe de ativo</span>
+      </div>
+
+      {% if investments %}
+        <ul class="divide-y divide-slate-50">
+          {% for type_name, value in inv_by_type.items %}
+          <li class="flex items-center justify-between px-5 py-3.5">
+            <p class="text-sm font-medium text-obsidian">{{ type_name }}</p>
+            <p class="text-sm font-bold text-obsidian">R$&nbsp;{{ value|brl }}</p>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="flex items-center justify-between border-t border-slate-100 px-5 py-3">
+          <p class="text-xs font-medium text-smoke">Total investido</p>
+          <p class="text-sm font-black text-obsidian">R$&nbsp;{{ inv_total|brl }}</p>
+        </div>
+      {% else %}
+        <div class="flex flex-col items-center gap-3 px-5 py-10 text-center">
+          <div class="flex h-12 w-12 items-center justify-center rounded-full bg-signal/10">
+            <svg class="h-6 w-6 text-signal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+          </div>
+          <p class="text-sm font-medium text-obsidian">Nenhum investimento cadastrado</p>
+          <button onclick="document.getElementById('modal-novo-investimento').classList.remove('hidden')"
+                  class="text-sm font-semibold text-signal hover:text-signal/80 transition-colors">
+            Adicionar investimento
+          </button>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Lista detalhada de investimentos -->
+  {% if investments %}
+  <div class="rounded-xl border border-slate-100 bg-white shadow-sm">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      <h3 class="font-semibold text-obsidian">Ativos</h3>
+      <button onclick="document.getElementById('modal-novo-investimento').classList.remove('hidden')"
+              class="inline-flex items-center gap-1.5 rounded-lg bg-signal/10 px-3 py-1.5 text-xs font-semibold text-signal transition-colors hover:bg-signal/20">
+        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Adicionar
+      </button>
+    </div>
+    <ul class="divide-y divide-slate-50">
+      {% for inv in investments %}
+      <li class="flex items-center justify-between px-5 py-3.5 group">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-signal/10">
+            <svg class="h-4 w-4 text-signal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-obsidian truncate">
+              {{ inv.name }}{% if inv.ticker %} <span class="text-xs font-normal text-smoke">· {{ inv.ticker }}</span>{% endif %}
+            </p>
+            <p class="text-xs text-smoke">{{ inv.get_type_display }} · {{ inv.quantity|brl }} un.</p>
+          </div>
+        </div>
+        <div class="flex flex-shrink-0 items-center gap-3 ml-3">
+          <div class="text-right">
+            <p class="text-sm font-bold text-obsidian">R$&nbsp;{{ inv.current_value|brl }}</p>
+            <p class="text-xs {% if inv.profit_loss >= 0 %}text-solve{% else %}text-red-500{% endif %}">
+              {% if inv.profit_loss >= 0 %}+{% endif %}R$&nbsp;{{ inv.profit_loss|brl }}
+            </p>
+          </div>
+          <!-- Ações -->
+          <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onclick="openEditInv({{ inv.pk }}, '{{ inv.name|escapejs }}', '{{ inv.ticker }}', '{{ inv.current_price }}', '{{ inv.quantity }}')"
+              class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke hover:bg-slate-100 hover:text-obsidian transition-colors">
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+            </button>
+            <form method="post" action="{% url 'investimento_excluir' inv.pk %}" onsubmit="return confirm('Excluir investimento?')" class="inline">
+              {% csrf_token %}
+              <button type="submit" class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke hover:bg-red-50 hover:text-red-500 transition-colors">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Metas -->
+  <div class="rounded-xl border border-slate-100 bg-white shadow-sm">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      <h3 class="font-semibold text-obsidian">Metas ativas</h3>
+      <a href="{% url 'metas' %}" class="text-xs font-medium text-solve hover:text-solve-dark transition-colors">Ver todas</a>
+    </div>
+
+    {% if goals %}
+      <ul class="divide-y divide-slate-50">
+        {% for g in goals %}
+        <li class="px-5 py-4">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-semibold text-obsidian">{{ g.name }}</p>
+            <p class="text-sm font-bold text-obsidian">{{ g.progress_percent }}%</p>
+          </div>
+          <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div class="h-full rounded-full bg-solve transition-all" style="width:{{ g.progress_percent }}%"></div>
+          </div>
+          <div class="mt-1 flex items-center justify-between">
+            <p class="text-xs text-smoke">R$&nbsp;{{ g.current_amount|brl }} de R$&nbsp;{{ g.target_amount|brl }}</p>
+            {% if g.deadline %}<p class="text-xs text-smoke">até {{ g.deadline }}</p>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="flex flex-col items-center gap-3 px-5 py-10 text-center">
+        <div class="flex h-12 w-12 items-center justify-center rounded-full bg-solve/10">
+          <svg class="h-6 w-6 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <p class="text-sm font-medium text-obsidian">Nenhuma meta criada</p>
+        <a href="{% url 'metas' %}" class="text-sm font-semibold text-solve hover:text-solve-dark transition-colors">Criar primeira meta</a>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ─── Modal: Novo Investimento ─── -->
+<div id="modal-novo-investimento" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="font-black text-obsidian">Novo investimento</h2>
+      <button onclick="document.getElementById('modal-novo-investimento').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'investimento_criar' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Nome</label>
+        <input type="text" name="name" required placeholder="Ex: Tesouro Direto, PETR4…" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Tipo</label>
+          <select name="type" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+            {% for val, label in investment_types %}
+            <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Ticker (opcional)</label>
+          <input type="text" name="ticker" placeholder="Ex: PETR4, IVVB11" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Quantidade</label>
+          <input type="number" name="quantity" step="0.001" min="0" value="1" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Preço de compra</label>
+          <input type="number" name="purchase_price" step="0.01" min="0" required placeholder="0,00" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Preço atual</label>
+          <input type="number" name="current_price" step="0.01" min="0" placeholder="0,00" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Data de compra</label>
+          <input type="date" name="purchase_date" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Conta (opcional)</label>
+          <select name="account" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+            <option value="">Selecione…</option>
+            {% for acc in inv_accounts %}
+            <option value="{{ acc.id }}">{{ acc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="w-full rounded-lg bg-signal py-3 text-sm font-black text-white transition-colors hover:bg-signal/90">
+        Adicionar investimento
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── Modal: Editar Investimento ─── -->
+<div id="modal-editar-inv" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="font-black text-obsidian">Editar investimento</h2>
+      <button onclick="document.getElementById('modal-editar-inv').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="form-editar-inv" method="post" action="#" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Nome</label>
+        <input type="text" id="edit-inv-name" name="name" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Ticker</label>
+          <input type="text" id="edit-inv-ticker" name="ticker" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Quantidade</label>
+          <input type="number" id="edit-inv-quantity" name="quantity" step="0.001" min="0" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Preço atual (R$)</label>
+        <input type="number" id="edit-inv-price" name="current_price" step="0.01" min="0" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+      </div>
+      <button type="submit" class="w-full rounded-lg bg-signal py-3 text-sm font-black text-white transition-colors hover:bg-signal/90">
+        Salvar alterações
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditInv(pk, name, ticker, price, quantity) {
+  document.getElementById('form-editar-inv').action = '/dashboard/investimentos/' + pk + '/editar/';
+  document.getElementById('edit-inv-name').value = name;
+  document.getElementById('edit-inv-ticker').value = ticker;
+  document.getElementById('edit-inv-price').value = price;
+  document.getElementById('edit-inv-quantity').value = quantity;
+  document.getElementById('modal-editar-inv').classList.remove('hidden');
+}
+</script>
+
+{% endblock %}
