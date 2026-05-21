@@ -16,6 +16,9 @@ urlpatterns = [
     path("lancamentos/<int:pk>/editar/", views.lancamento_editar, name="lancamento_editar"),
     path("lancamentos/<int:pk>/excluir/", views.lancamento_excluir, name="lancamento_excluir"),
 
+    # Transferências entre custódias
+    path("transferencias/criar/", views.transferencia_criar, name="transferencia_criar"),
+
     # Lançamentos fixos (recorrentes)
     path("fixos/criar/", views.fixo_criar, name="fixo_criar"),
     path("fixos/<int:pk>/editar/", views.fixo_editar, name="fixo_editar"),

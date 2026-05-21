@@ -108,6 +108,17 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CRISPY_ALLOWED_TEMPLATE_PACKS = "tailwind"
 CRISPY_TEMPLATE_PACK = "tailwind"
 
+# ── Segurança (produção) ───────────────────────────────────────────────────────
+# Quando rodando atrás de Railway/Render/nginx que terminam o SSL
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/onboarding/plan/"

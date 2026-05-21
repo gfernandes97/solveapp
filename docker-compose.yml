@@ -1,4 +1,20 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: solve
+      POSTGRES_USER: solve
+      POSTGRES_PASSWORD: solve
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U solve"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   web:
     build:
       context: ./frontend
@@ -10,4 +26,11 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - DJANGO_SETTINGS_MODULE=config.settings
+      - DATABASE_URL=postgresql://solve:solve@db:5432/solve
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  postgres_data:

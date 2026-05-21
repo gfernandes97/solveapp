@@ -195,13 +195,19 @@
             <p class="text-sm font-semibold text-obsidian">{{ g.name }}</p>
           </div>
           <div class="flex items-center gap-3">
-            <p class="text-xs text-smoke">R$&nbsp;{{ g.current_amount|brl }}&nbsp;/&nbsp;{{ g.target_amount|brl }}</p>
-            <p class="text-sm font-black text-obsidian w-9 text-right">{{ g.progress_percent }}%</p>
+            <p class="text-xs text-smoke">R$&nbsp;{{ g.executed_amount|brl }}&nbsp;/&nbsp;{{ g.target_amount|brl }}</p>
+            <p class="text-sm font-black text-obsidian w-9 text-right">{{ g.executed_pct }}%</p>
           </div>
         </div>
-        <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-          <div class="h-full rounded-full transition-all" style="width:{{ g.progress_percent }}%; background-color:{{ g.color }}"></div>
+        <div class="relative h-2 w-full overflow-hidden rounded-full bg-slate-100">
+          {% if g.provisioned_pct %}
+          <div class="absolute inset-y-0 left-0 rounded-full transition-all" style="width:{{ g.provisioned_pct }}%;background-color:{{ g.color }};opacity:0.25"></div>
+          {% endif %}
+          <div class="absolute inset-y-0 left-0 rounded-full transition-all" style="width:{{ g.executed_pct }}%;background-color:{{ g.color }}"></div>
         </div>
+        {% if g.provisioned_amount > g.executed_amount %}
+        <p class="mt-0.5 text-[10px] text-smoke/50">R$&nbsp;{{ g.provisioned_amount|brl }} provisionado</p>
+        {% endif %}
         {% if g.deadline %}
         <p class="mt-0.5 text-xs text-smoke/60">Prazo: {{ g.deadline|date:"d/m/Y" }}</p>
         {% endif %}

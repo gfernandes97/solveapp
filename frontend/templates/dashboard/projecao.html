@@ -145,7 +145,7 @@
 
           <!-- Opção: Entrada -->
           <button type="button"
-                  onclick="openAjusteModal('credit','{{ issue.batimento_abs }}',{{ row.month|date:'Y' }},{{ row.month|date:'n' }},'{{ row.label|escapejs }}',{{ issue.account_id }})"
+                  onclick="openAjusteModal('credit','{{ issue.batimento_abs_str }}',{{ row.month|date:'Y' }},{{ row.month|date:'n' }},'{{ row.label|escapejs }}',{{ issue.account_id }})"
                   class="group flex items-start gap-3 rounded-xl border-2 border-solve/40 bg-white p-4 text-left shadow-sm transition-all hover:border-solve hover:bg-solve/5 hover:shadow-md">
             <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-solve/10 text-solve transition-colors group-hover:bg-solve group-hover:text-white">
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 11l5-5m0 0l5 5m-5-5v12"/></svg>
@@ -159,7 +159,7 @@
 
           <!-- Opção: Saída -->
           <button type="button"
-                  onclick="openAjusteModal('debit','{{ issue.batimento_abs }}',{{ row.month|date:'Y' }},{{ row.month|date:'n' }},'{{ row.label|escapejs }}',{{ issue.account_id }})"
+                  onclick="openAjusteModal('debit','{{ issue.batimento_abs_str }}',{{ row.month|date:'Y' }},{{ row.month|date:'n' }},'{{ row.label|escapejs }}',{{ issue.account_id }})"
                   class="group flex items-start gap-3 rounded-xl border-2 border-red-300 bg-white p-4 text-left shadow-sm transition-all hover:border-red-500 hover:bg-red-50 hover:shadow-md">
             <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-400 transition-colors group-hover:bg-red-500 group-hover:text-white">
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 13l-5 5m0 0l-5-5m5 5V6"/></svg>
@@ -191,15 +191,15 @@
           <th class="border-l border-slate-100 px-3 py-3 text-right" rowspan="2">Saldo Final</th>
         </tr>
         <tr class="border-b-2 border-slate-200 bg-slate-50 text-xs text-smoke/60">
-          <th class="border-l border-slate-100 px-3 py-2 text-right font-medium">Fixas</th>
-          <th class="px-3 py-2 text-right font-medium">Variáveis</th>
-          <th class="px-3 py-2 text-right font-semibold text-solve">Total</th>
-          <th class="border-l border-slate-100 px-3 py-2 text-right font-medium">Fixas</th>
-          <th class="px-3 py-2 text-right font-medium">Variáveis</th>
-          <th class="px-3 py-2 text-right font-semibold text-red-400">Total</th>
-          <th class="border-l border-slate-100 px-3 py-2 text-right font-medium">Caixa</th>
-          <th class="px-3 py-2 text-right font-medium">Investimentos</th>
-          <th class="px-3 py-2 text-right font-semibold">Total</th>
+          <th class="border-l border-slate-100 px-3 py-2 text-right font-medium whitespace-nowrap">Fixas</th>
+          <th class="px-3 py-2 text-right font-medium whitespace-nowrap">Variáveis</th>
+          <th class="px-3 py-2 text-right font-semibold text-solve whitespace-nowrap">Total</th>
+          <th class="border-l border-slate-100 px-3 py-2 text-right font-medium whitespace-nowrap">Fixas</th>
+          <th class="px-3 py-2 text-right font-medium whitespace-nowrap">Variáveis</th>
+          <th class="px-3 py-2 text-right font-semibold text-red-400 whitespace-nowrap">Total</th>
+          <th class="border-l border-slate-100 px-3 py-2 text-right font-medium whitespace-nowrap">Caixa</th>
+          <th class="px-3 py-2 text-right font-medium whitespace-nowrap">Investimentos</th>
+          <th class="px-3 py-2 text-right font-semibold whitespace-nowrap">Total</th>
         </tr>
       </thead>
 
@@ -207,8 +207,9 @@
         {% for row in rows %}
 
         {% if row.is_past %}
-        <tr class="border-b border-slate-50 text-slate-400 transition-colors hover:bg-slate-50/70">
+        <tr class="border-b border-slate-50 text-slate-400 transition-colors hover:bg-slate-50/70 cursor-pointer select-none" onclick="toggleDrill({{ forloop.counter }})">
           <td class="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-slate-400 hover:bg-slate-50/70">
+            <svg id="drill-chevron-{{ forloop.counter }}" class="mr-1.5 inline h-3 w-3 text-slate-300 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
             <span class="whitespace-nowrap">{{ row.label }}</span>
             <span class="ml-1.5 inline-block rounded px-1 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-400">Real</span>
             {% if row.batimento_ok == False %}
@@ -216,23 +217,23 @@
                   title="{% for i in row.batimento_issues %}{{ i.account_name }}: R${{ i.batimento_abs|brl }}{% if not forloop.last %} | {% endif %}{% endfor %}">⚠ batimento</span>
             {% endif %}
           </td>
-          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums">{{ row.fixed_income|brl }}</td>
-          <td class="px-3 py-3 text-right tabular-nums">{{ row.var_income|brl }}</td>
-          <td class="px-3 py-3 text-right tabular-nums font-semibold {% if row.total_income > 0 %}text-solve/60{% endif %}">{{ row.total_income|brl }}</td>
-          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums">{{ row.fixed_expense|brl }}</td>
-          <td class="px-3 py-3 text-right tabular-nums">{{ row.var_expense|brl }}</td>
-          <td class="px-3 py-3 text-right tabular-nums font-semibold {% if row.total_expense > 0 %}text-red-300{% endif %}">{{ row.total_expense|brl }}</td>
-          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums font-bold {% if row.net >= 0 %}text-solve/50{% else %}text-red-300{% endif %}">
+          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums whitespace-nowrap">{{ row.fixed_income|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums whitespace-nowrap">{{ row.var_income|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums font-semibold whitespace-nowrap {% if row.total_income > 0 %}text-solve/60{% endif %}">{{ row.total_income|brl }}</td>
+          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums whitespace-nowrap">{{ row.fixed_expense|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums whitespace-nowrap">{{ row.var_expense|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums font-semibold whitespace-nowrap {% if row.total_expense > 0 %}text-red-300{% endif %}">{{ row.total_expense|brl }}</td>
+          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums font-bold whitespace-nowrap {% if row.net >= 0 %}text-solve/50{% else %}text-red-300{% endif %}">
             {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
           </td>
-          <td class="px-3 py-3 text-right tabular-nums text-slate-300">
+          <td class="px-3 py-3 text-right tabular-nums text-slate-300 whitespace-nowrap">
             {% if row.inv_result is not None %}
               <span class="{% if row.inv_result >= 0 %}text-signal/50{% else %}text-red-300{% endif %}">
                 {% if row.inv_result >= 0 %}+{% endif %}{{ row.inv_result|brl }}
               </span>
             {% else %}—{% endif %}
           </td>
-          <td class="px-3 py-3 text-right tabular-nums font-semibold text-slate-400">
+          <td class="px-3 py-3 text-right tabular-nums font-semibold text-slate-400 whitespace-nowrap">
             {% if row.result_total is not None %}
               <span class="{% if row.result_total >= 0 %}text-solve/50{% else %}text-red-300{% endif %}">
                 {% if row.result_total >= 0 %}+{% endif %}{{ row.result_total|brl }}
@@ -243,15 +244,15 @@
               </span>
             {% else %}—{% endif %}
           </td>
-          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums font-semibold {% if row.batimento_ok == False %}bg-solar/5 text-solar{% else %}text-slate-400{% endif %}">
+          <td class="border-l border-slate-50 px-3 py-3 text-right tabular-nums font-semibold whitespace-nowrap {% if row.batimento_ok == False %}bg-solar/5 text-solar{% else %}text-slate-400{% endif %}">
             {{ row.end_balance|brl }}
-            {% if row.cash_snap is not None %}<span class="ml-0.5 text-[9px] text-slate-300" title="Saldo registrado">●</span>{% endif %}
           </td>
         </tr>
 
         {% elif row.is_current %}
-        <tr class="border-y-2 border-obsidian bg-obsidian text-white">
+        <tr class="border-y-2 border-obsidian bg-obsidian text-white cursor-pointer select-none" onclick="toggleDrill({{ forloop.counter }})">
           <td class="sticky left-0 z-10 bg-obsidian px-4 py-4 font-black">
+            <svg id="drill-chevron-{{ forloop.counter }}" class="mr-1.5 inline h-3 w-3 text-white/30 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
             <span class="whitespace-nowrap">{{ row.label }}</span>
             <span class="ml-1.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-black bg-solve text-white">Atual</span>
             {% if row.batimento_ok == False %}
@@ -259,63 +260,155 @@
                   title="{% for i in row.batimento_issues %}{{ i.account_name }}: R${{ i.batimento_abs|brl }}{% if not forloop.last %} | {% endif %}{% endfor %}">⚠ batimento</span>
             {% endif %}
           </td>
-          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums text-white/70">{{ row.fixed_income|brl }}</td>
-          <td class="px-3 py-4 text-right tabular-nums text-white/70">{{ row.var_income|brl }}</td>
-          <td class="px-3 py-4 text-right tabular-nums font-bold text-solve">{{ row.total_income|brl }}</td>
-          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums text-white/70">{{ row.fixed_expense|brl }}</td>
-          <td class="px-3 py-4 text-right tabular-nums text-white/70">{{ row.var_expense|brl }}</td>
-          <td class="px-3 py-4 text-right tabular-nums font-bold text-red-400">{{ row.total_expense|brl }}</td>
-          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums font-black text-lg {% if row.net >= 0 %}text-solve{% else %}text-red-400{% endif %}">
+          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums text-white/70 whitespace-nowrap">{{ row.fixed_income|brl }}</td>
+          <td class="px-3 py-4 text-right tabular-nums text-white/70 whitespace-nowrap">{{ row.var_income|brl }}</td>
+          <td class="px-3 py-4 text-right tabular-nums font-bold text-solve whitespace-nowrap">{{ row.total_income|brl }}</td>
+          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums text-white/70 whitespace-nowrap">{{ row.fixed_expense|brl }}</td>
+          <td class="px-3 py-4 text-right tabular-nums text-white/70 whitespace-nowrap">{{ row.var_expense|brl }}</td>
+          <td class="px-3 py-4 text-right tabular-nums font-bold text-red-400 whitespace-nowrap">{{ row.total_expense|brl }}</td>
+          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums font-black text-lg whitespace-nowrap {% if row.net >= 0 %}text-solve{% else %}text-red-400{% endif %}">
             {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
           </td>
-          <td class="px-3 py-4 text-right tabular-nums text-white/50">
+          <td class="px-3 py-4 text-right tabular-nums text-white/50 whitespace-nowrap">
             {% if row.inv_result is not None %}
               <span class="{% if row.inv_result >= 0 %}text-signal{% else %}text-red-400{% endif %}">
                 {% if row.inv_result >= 0 %}+{% endif %}{{ row.inv_result|brl }}
               </span>
             {% else %}—{% endif %}
           </td>
-          <td class="px-3 py-4 text-right tabular-nums font-black text-lg {% if row.result_total is not None %}{% if row.result_total >= 0 %}text-solve{% else %}text-red-400{% endif %}{% elif row.net >= 0 %}text-solve{% else %}text-red-400{% endif %}">
+          <td class="px-3 py-4 text-right tabular-nums font-black text-lg whitespace-nowrap {% if row.result_total is not None %}{% if row.result_total >= 0 %}text-solve{% else %}text-red-400{% endif %}{% elif row.net >= 0 %}text-solve{% else %}text-red-400{% endif %}">
             {% if row.result_total is not None %}
               {% if row.result_total >= 0 %}+{% endif %}{{ row.result_total|brl }}
             {% else %}
               {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
             {% endif %}
           </td>
-          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums font-black text-lg {% if row.batimento_ok == False %}text-solar{% else %}text-white{% endif %}">
+          <td class="border-l border-white/10 px-3 py-4 text-right tabular-nums font-black text-lg whitespace-nowrap {% if row.batimento_ok == False %}text-solar{% else %}text-white{% endif %}">
             {{ row.end_balance|brl }}
-            {% if row.cash_snap is not None %}<span class="ml-0.5 text-[9px] text-white/30" title="Saldo registrado">●</span>{% endif %}
           </td>
         </tr>
 
         {% else %}
-        <tr class="border-b border-signal/10 bg-signal/[0.03] transition-colors hover:bg-signal/[0.07]">
+        <tr class="border-b border-signal/10 bg-signal/[0.03] transition-colors hover:bg-signal/[0.07] cursor-pointer select-none" onclick="toggleDrill({{ forloop.counter }})">
           <td class="sticky left-0 z-10 bg-signal/[0.03] px-4 py-3 font-medium text-obsidian hover:bg-signal/[0.07]">
+            <svg id="drill-chevron-{{ forloop.counter }}" class="mr-1.5 inline h-3 w-3 text-slate-300 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
             <span class="whitespace-nowrap">{{ row.label }}</span>
             <span class="ml-1.5 inline-block rounded px-1 py-0.5 text-[10px] font-semibold bg-signal/15 text-signal">Proj.</span>
           </td>
-          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums text-obsidian/60 italic">{{ row.fixed_income|brl }}</td>
-          <td class="px-3 py-3 text-right tabular-nums {% if row.var_income %}text-obsidian/80{% else %}text-smoke/40 italic{% endif %}">
+          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums text-obsidian/60 italic whitespace-nowrap">{{ row.fixed_income|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums whitespace-nowrap {% if row.var_income %}text-obsidian/80{% else %}text-smoke/40 italic{% endif %}">
             {% if row.var_income %}{{ row.var_income|brl }}{% else %}—{% endif %}
           </td>
-          <td class="px-3 py-3 text-right tabular-nums font-semibold text-solve">{{ row.total_income|brl }}</td>
-          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums text-obsidian/60 italic">{{ row.fixed_expense|brl }}</td>
-          <td class="px-3 py-3 text-right tabular-nums {% if row.var_expense %}text-obsidian/80{% else %}text-smoke/40 italic{% endif %}">
+          <td class="px-3 py-3 text-right tabular-nums font-semibold text-solve whitespace-nowrap">{{ row.total_income|brl }}</td>
+          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums text-obsidian/60 italic whitespace-nowrap">{{ row.fixed_expense|brl }}</td>
+          <td class="px-3 py-3 text-right tabular-nums whitespace-nowrap {% if row.var_expense %}text-obsidian/80{% else %}text-smoke/40 italic{% endif %}">
             {% if row.var_expense %}{{ row.var_expense|brl }}{% else %}—{% endif %}
           </td>
-          <td class="px-3 py-3 text-right tabular-nums font-semibold text-red-400">{{ row.total_expense|brl }}</td>
-          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums font-bold {% if row.net >= 0 %}text-solve{% else %}text-red-500{% endif %}">
+          <td class="px-3 py-3 text-right tabular-nums font-semibold text-red-400 whitespace-nowrap">{{ row.total_expense|brl }}</td>
+          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums font-bold whitespace-nowrap {% if row.net >= 0 %}text-solve{% else %}text-red-500{% endif %}">
             {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
           </td>
-          <td class="px-3 py-3 text-right tabular-nums text-smoke/40 italic">—</td>
-          <td class="px-3 py-3 text-right tabular-nums font-bold {% if row.net >= 0 %}text-solve{% else %}text-red-500{% endif %}">
+          <td class="px-3 py-3 text-right tabular-nums text-smoke/40 italic whitespace-nowrap">—</td>
+          <td class="px-3 py-3 text-right tabular-nums font-bold whitespace-nowrap {% if row.net >= 0 %}text-solve{% else %}text-red-500{% endif %}">
             {% if row.net >= 0 %}+{% endif %}{{ row.net|brl }}
           </td>
-          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums font-bold {% if row.end_balance >= 0 %}text-signal{% else %}text-red-500{% endif %}">
+          <td class="border-l border-signal/10 px-3 py-3 text-right tabular-nums font-bold whitespace-nowrap {% if row.end_balance >= 0 %}text-signal{% else %}text-red-500{% endif %}">
             {{ row.end_balance|brl }}
           </td>
         </tr>
         {% endif %}
+
+        <!-- ── Drill-down detail row (toggled on click) ── -->
+        <tr id="drill-{{ forloop.counter }}" class="hidden">
+          <td colspan="11" class="p-0">
+            <div class="border-b border-slate-200 bg-slate-50/80 px-6 py-5 space-y-4">
+              {% if row.drill %}
+              {% for acc in row.drill %}
+              <div class="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+                <!-- Account header -->
+                <div class="flex items-center gap-2.5 px-4 py-2.5"
+                     style="background-color:{{ acc.color }}18; border-left:3px solid {{ acc.color }};">
+                  <span class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full" style="background-color:{{ acc.color }}"></span>
+                  <span class="text-sm font-bold text-obsidian">{{ acc.name }}</span>
+                  <span class="ml-auto text-xs text-smoke/50">{{ acc.txs|length }}&nbsp;lançamento{{ acc.txs|length|pluralize }}</span>
+                </div>
+                {% if acc.txs %}
+                <!-- Transaction table -->
+                <div class="overflow-x-auto bg-white">
+                  <table class="w-full text-xs">
+                    <thead>
+                      <tr class="border-b border-slate-100 text-[11px] text-smoke/60">
+                        <th class="w-14 px-4 py-1.5 text-left font-medium">Data</th>
+                        <th class="px-3 py-1.5 text-left font-medium">Descrição</th>
+                        <th class="w-28 px-3 py-1.5 text-right font-medium text-solve">Entrada</th>
+                        <th class="w-28 px-3 py-1.5 text-right font-medium text-red-400">Saída</th>
+                        <th class="w-28 px-3 py-1.5 text-right font-medium">Resultado</th>
+                        <th class="w-32 px-3 py-1.5 text-right font-medium">Saldo Final</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% if acc.opening_balance is not None %}
+                      <tr class="border-b border-slate-100 bg-slate-50 text-xs font-semibold text-smoke/60">
+                        <td class="px-4 py-2 tabular-nums text-smoke/40">—</td>
+                        <td class="px-3 py-2">Saldo de abertura</td>
+                        <td class="px-3 py-2 text-right tabular-nums text-smoke/30">—</td>
+                        <td class="px-3 py-2 text-right tabular-nums text-smoke/30">—</td>
+                        <td class="px-3 py-2 text-right tabular-nums text-smoke/30">—</td>
+                        <td class="px-3 py-2 text-right tabular-nums text-obsidian">{{ acc.opening_balance|brl }}</td>
+                      </tr>
+                      {% endif %}
+                      {% for tx in acc.txs %}
+                      <tr class="border-b border-slate-50 hover:bg-slate-50/60">
+                        <td class="px-4 py-1.5 tabular-nums text-smoke">
+                          {% if tx.date %}{{ tx.date|date:"d/m" }}{% else %}<span class="italic text-smoke/40">proj.</span>{% endif %}
+                        </td>
+                        <td class="max-w-xs truncate px-3 py-1.5 text-obsidian">
+                          {{ tx.description }}{% if tx.category_name %}<span class="text-smoke/50"> · {{ tx.category_name }}</span>{% endif %}{% if tx.is_recurring %}<span class="ml-1 inline-block rounded bg-signal/10 px-1 text-[9px] font-semibold text-signal/70">fixo</span>{% endif %}{% if tx.is_transfer %}<span class="ml-1 inline-block rounded bg-amber-100 px-1 text-[9px] font-semibold text-amber-600">transf.</span>{% endif %}
+                        </td>
+                        <td class="px-3 py-1.5 text-right tabular-nums {% if tx.credit %}text-solve font-semibold{% else %}text-smoke/25{% endif %}">
+                          {% if tx.credit %}+{{ tx.credit|brl }}{% else %}—{% endif %}
+                        </td>
+                        <td class="px-3 py-1.5 text-right tabular-nums {% if tx.debit %}text-red-500 font-semibold{% else %}text-smoke/25{% endif %}">
+                          {% if tx.debit %}-{{ tx.debit|brl }}{% else %}—{% endif %}
+                        </td>
+                        <td class="px-3 py-1.5 text-right tabular-nums font-semibold {% if tx.credit %}text-solve{% else %}text-red-500{% endif %}">
+                          {% if tx.credit %}+{{ tx.credit|brl }}{% else %}-{{ tx.debit|brl }}{% endif %}
+                        </td>
+                        <td class="px-3 py-1.5 text-right tabular-nums text-obsidian font-semibold">
+                          {% if tx.running_balance is not None %}{{ tx.running_balance|brl }}{% else %}<span class="text-smoke/30">—</span>{% endif %}
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                    <tfoot>
+                      <tr class="border-t-2 border-slate-200 bg-slate-50 text-xs font-semibold">
+                        <td class="px-4 py-2 text-smoke/40">—</td>
+                        <td class="px-3 py-2 text-smoke/60">Total</td>
+                        <td class="px-3 py-2 text-right tabular-nums {% if acc.total_credit %}text-solve{% else %}text-smoke/30{% endif %}">
+                          {% if acc.total_credit %}+{{ acc.total_credit|brl }}{% else %}—{% endif %}
+                        </td>
+                        <td class="px-3 py-2 text-right tabular-nums {% if acc.total_debit %}text-red-400{% else %}text-smoke/30{% endif %}">
+                          {% if acc.total_debit %}-{{ acc.total_debit|brl }}{% else %}—{% endif %}
+                        </td>
+                        <td class="px-3 py-2 text-right tabular-nums font-bold {% if acc.total_net >= 0 %}text-solve{% else %}text-red-500{% endif %}">
+                          {% if acc.total_net >= 0 %}+{% endif %}{{ acc.total_net|brl }}
+                        </td>
+                        <td class="px-3 py-2 text-right tabular-nums text-smoke/40">—</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                {% else %}
+                <p class="bg-white px-4 py-3 text-xs italic text-smoke/50">Nenhum lançamento neste mês</p>
+                {% endif %}
+              </div>
+              {% endfor %}
+              {% else %}
+              <p class="py-4 text-center text-xs text-smoke/50">Nenhum lançamento registrado neste mês</p>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
 
         {% empty %}
         <tr>
@@ -357,7 +450,7 @@
 
   <p class="text-center text-xs text-smoke/40">
     Projeções baseadas nos lançamentos fixos (recorrentes) cadastrados.
-    Saldo final ancorado nos registros mensais de saldo das custódias · <span class="font-medium">●</span> indica mês com saldo registrado.
+    Saldo final ancorado nos registros mensais de saldo das custódias.
   </p>
 
 </div>
@@ -454,6 +547,14 @@ function closeAjusteModal() {
 document.getElementById('modal-ajuste').addEventListener('click', function(e) {
   if (e.target === this) closeAjusteModal();
 });
+
+function toggleDrill(n) {
+  const row = document.getElementById('drill-' + n);
+  if (!row) return;
+  const open = !row.classList.toggle('hidden');
+  const chevron = document.getElementById('drill-chevron-' + n);
+  if (chevron) chevron.style.transform = open ? 'rotate(90deg)' : '';
+}
 </script>
 
 {% if view_mode == 'chart' %}

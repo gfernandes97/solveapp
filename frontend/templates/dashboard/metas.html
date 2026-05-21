@@ -33,7 +33,7 @@
             </svg>
           </div>
           <div class="flex items-center gap-1">
-            <span class="text-xs font-semibold" style="color:{{ g.color }}">{{ g.progress_percent }}%</span>
+            <span class="text-xs font-semibold" style="color:{{ g.color }}">{{ g.executed_pct }}%</span>
             <!-- Edit -->
             <button
               onclick="openEditMeta({{ g.pk }}, '{{ g.name|escapejs }}', '{{ g.description|escapejs }}', '{{ g.target_amount }}', '{{ g.current_amount }}', '{{ g.deadline|date:'Y-m-d' }}', '{{ g.color }}')"
@@ -58,11 +58,19 @@
         <p class="mt-0.5 text-xs text-smoke line-clamp-2">{{ g.description }}</p>
         {% endif %}
         <!-- Barra de progresso -->
-        <div class="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-          <div class="h-full rounded-full transition-all" style="width:{{ g.progress_percent }}%;background-color:{{ g.color }}"></div>
+        <div class="mt-3 relative h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          {% if g.provisioned_pct %}
+          <div class="absolute inset-y-0 left-0 rounded-full transition-all" style="width:{{ g.provisioned_pct }}%;background-color:{{ g.color }};opacity:0.25"></div>
+          {% endif %}
+          <div class="absolute inset-y-0 left-0 rounded-full transition-all" style="width:{{ g.executed_pct }}%;background-color:{{ g.color }}"></div>
         </div>
         <div class="mt-2 flex items-center justify-between">
-          <p class="text-xs text-smoke">R$&nbsp;{{ g.current_amount|brl }}</p>
+          <div>
+            <p class="text-xs text-smoke">R$&nbsp;{{ g.executed_amount|brl }} <span class="text-smoke/50">executado</span></p>
+            {% if g.provisioned_amount > g.executed_amount %}
+            <p class="text-[10px] text-smoke/50">R$&nbsp;{{ g.provisioned_amount|brl }} provisionado</p>
+            {% endif %}
+          </div>
           <p class="text-xs font-semibold text-obsidian">R$&nbsp;{{ g.target_amount|brl }}</p>
         </div>
         {% if g.deadline %}

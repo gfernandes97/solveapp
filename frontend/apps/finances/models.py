@@ -120,6 +120,8 @@ class Transaction(models.Model):
     goal = models.ForeignKey(
         "Goal", on_delete=models.SET_NULL, null=True, blank=True, related_name="contributions"
     )
+    is_transfer = models.BooleanField(default=False)
+    transfer_ref = models.CharField(max_length=36, blank=True, db_index=True)
     # Preenchido quando a transação veio de um extrato importado
     imported_from = models.ForeignKey(
         "Statement", on_delete=models.SET_NULL, null=True, blank=True, related_name="transactions"
@@ -241,6 +243,9 @@ class RecurringTransaction(models.Model):
     )
     category = models.ForeignKey(
         Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="recurring_transactions"
+    )
+    goal = models.ForeignKey(
+        "Goal", on_delete=models.SET_NULL, null=True, blank=True, related_name="recurring_contributions"
     )
     name = models.CharField(max_length=200)
     amount = models.DecimalField(max_digits=12, decimal_places=2)

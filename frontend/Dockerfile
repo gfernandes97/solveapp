@@ -12,8 +12,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+COPY entrypoint.sh /entrypoint.sh
+# Remove CRLF caso o arquivo tenha sido editado no Windows
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
 EXPOSE 8000
 
-# Dev: Django runserver
-# Prod: trocar por gunicorn config.wsgi:application --bind 0.0.0.0:8000
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+ENTRYPOINT ["/entrypoint.sh"]
