@@ -16,3 +16,4 @@ psycopg2-binary==2.9.10
 # Required by allauth Google OAuth2 provider
 PyJWT>=2.0
 cryptography>=40.0
+requests>=2.31
