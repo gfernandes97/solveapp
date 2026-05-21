@@ -189,27 +189,34 @@
     <div class="space-y-5">
       {% for g in goals %}
       <div>
-        <div class="flex items-center justify-between mb-1.5">
+        <div class="flex items-start justify-between gap-2 mb-1.5">
           <div class="flex items-center gap-2">
-            <div class="h-2.5 w-2.5 rounded-full flex-shrink-0" style="background-color:{{ g.color }}"></div>
+            <div class="h-2.5 w-2.5 rounded-full flex-shrink-0 mt-0.5" style="background-color:{{ g.color }}"></div>
             <p class="text-sm font-semibold text-obsidian">{{ g.name }}</p>
           </div>
-          <div class="flex items-center gap-3">
-            <p class="text-xs text-smoke">R$&nbsp;{{ g.executed_amount|brl }}&nbsp;/&nbsp;{{ g.target_amount|brl }}</p>
-            <p class="text-sm font-black text-obsidian w-9 text-right">{{ g.executed_pct }}%</p>
-          </div>
+          <p class="text-xs text-smoke/60 flex-shrink-0">Meta: R$&nbsp;{{ g.target_amount|brl }}</p>
         </div>
+        <!-- Executed bar -->
         <div class="relative h-2 w-full overflow-hidden rounded-full bg-slate-100">
           {% if g.provisioned_pct %}
-          <div class="absolute inset-y-0 left-0 rounded-full transition-all" style="width:{{ g.provisioned_pct }}%;background-color:{{ g.color }};opacity:0.25"></div>
+          <div class="absolute inset-y-0 left-0 rounded-full transition-all opacity-25" style="width:{{ g.provisioned_pct }}%;background-color:{{ g.color }}"></div>
           {% endif %}
           <div class="absolute inset-y-0 left-0 rounded-full transition-all" style="width:{{ g.executed_pct }}%;background-color:{{ g.color }}"></div>
         </div>
-        {% if g.provisioned_amount > g.executed_amount %}
-        <p class="mt-0.5 text-[10px] text-smoke/50">R$&nbsp;{{ g.provisioned_amount|brl }} provisionado</p>
-        {% endif %}
+        <!-- Metric labels -->
+        <div class="mt-1 flex items-center gap-4">
+          <p class="text-xs tabular-nums">
+            <span class="font-bold" style="color:{{ g.color }}">{{ g.executed_pct }}%</span>
+            <span class="text-smoke/60"> executado · R$&nbsp;{{ g.executed_amount|brl }}</span>
+          </p>
+          {% if g.provisioned_pct > g.executed_pct %}
+          <p class="text-xs tabular-nums text-smoke/40">
+            {{ g.provisioned_pct }}% prov. · R$&nbsp;{{ g.provisioned_amount|brl }}
+          </p>
+          {% endif %}
+        </div>
         {% if g.deadline %}
-        <p class="mt-0.5 text-xs text-smoke/60">Prazo: {{ g.deadline|date:"d/m/Y" }}</p>
+        <p class="mt-0.5 text-xs text-smoke/40">Prazo: {{ g.deadline|date:"d/m/Y" }}</p>
         {% endif %}
       </div>
       {% endfor %}

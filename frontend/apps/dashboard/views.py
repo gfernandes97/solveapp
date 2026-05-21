@@ -1,3 +1,4 @@
+import calendar
 import json
 import uuid
 from datetime import date, datetime, timedelta
@@ -73,6 +74,22 @@ def _add_months(d, n):
     return date(y, m + 1, 1)
 
 
+def _proj_date(r, mo):
+    """
+    Returns the expected calendar date for a RecurringTransaction in month mo.
+    Used to show a concrete date in past/current months instead of 'proj.'.
+    """
+    if r.frequency in (RecurringTransaction.FREQ_WEEKLY, RecurringTransaction.FREQ_BIWEEKLY):
+        if r.day_of_week is not None:
+            d = mo
+            while d.weekday() != r.day_of_week:
+                d += timedelta(days=1)
+            return d
+    # Monthly / quarterly / semiannual / annual: same day-of-month as start_date
+    max_day = calendar.monthrange(mo.year, mo.month)[1]
+    return date(mo.year, mo.month, min(r.start_date.day, max_day))
+
+
 def _amount_for_month(r, mo):
     """
     Exact amount contributed by RecurringTransaction r in calendar month mo.
@@ -137,56 +154,66 @@ def _amount_for_month(r, mo):
 def _compute_goal_progress(goals, today):
     """
     Returns {goal_id: {executed, provisioned, executed_pct, provisioned_pct}}
-    executed   = variable credits + recurring amounts up to today
-    provisioned = executed + future variable credits + future recurring up to deadline
+
+    executed    = RecurringTransaction credits for months up to today_mo (fixas já pagas)
+                + Transaction credits with date <= today (variáveis realizadas)
+
+    provisioned = executed
+                + RecurringTransaction credits for months today_mo+1 → deadline (fixas futuras)
+                + Transaction credits with date > today already in lançamentos (variáveis futuras)
     """
     goal_ids = [g.pk for g in goals]
     if not goal_ids:
         return {}
 
     today_mo = today.replace(day=1)
+    goals_map = {g.pk: g for g in goals}
 
+    # Variable transactions: past (realised) and future (already registered).
+    # No type filter — goals track total commitment regardless of credit/debit direction.
     tx_exec = {
         r["goal_id"]: r["total"]
         for r in Transaction.objects.filter(
             goal_id__in=goal_ids,
-            type=Transaction.TYPE_CREDIT,
             date__lte=today,
-            status=Transaction.STATUS_COMPLETED,
         ).values("goal_id").annotate(total=Sum("amount"))
     }
     tx_future = {
         r["goal_id"]: r["total"]
         for r in Transaction.objects.filter(
             goal_id__in=goal_ids,
-            type=Transaction.TYPE_CREDIT,
             date__gt=today,
         ).values("goal_id").annotate(total=Sum("amount"))
     }
 
-    goals_map = {g.pk: g for g in goals}
+    # Recurring (fixed): split into past months (executed) and future months (provisioned).
+    # No type filter — both expense and income recurring items linked to a goal count.
     rec_exec: dict = {}
     rec_future: dict = {}
-    rec_qs = list(
-        RecurringTransaction.objects.filter(
-            goal_id__in=goal_ids,
-            type=RecurringTransaction.TYPE_INCOME,
-            is_active=True,
-        )
-    )
-    for r in rec_qs:
+    for r in RecurringTransaction.objects.filter(
+        goal_id__in=goal_ids,
+        is_active=True,
+    ):
         gid = r.goal_id
         g = goals_map.get(gid)
         if g is None:
             continue
+
+        # Past: every month from start up to and including today_mo
         mo = r.start_date.replace(day=1)
         while mo <= today_mo:
-            rec_exec[gid] = rec_exec.get(gid, Decimal("0")) + _amount_for_month(r, mo)
+            amt = _amount_for_month(r, mo)
+            if amt:
+                rec_exec[gid] = rec_exec.get(gid, Decimal("0")) + amt
             mo = _add_months(mo, 1)
+
+        # Future: today_mo+1 through goal deadline (or 12 months if no deadline)
         end_mo = g.deadline.replace(day=1) if g.deadline else _add_months(today_mo, 12)
         mo = _add_months(today_mo, 1)
         while mo <= end_mo:
-            rec_future[gid] = rec_future.get(gid, Decimal("0")) + _amount_for_month(r, mo)
+            amt = _amount_for_month(r, mo)
+            if amt:
+                rec_future[gid] = rec_future.get(gid, Decimal("0")) + amt
             mo = _add_months(mo, 1)
 
     result = {}
@@ -202,6 +229,101 @@ def _compute_goal_progress(goals, today):
             "provisioned_pct": min(int(provisioned / tgt * 100), 100),
         }
     return result
+
+
+def _projected_cash_balance(user, today):
+    """
+    Returns the projected total cash balance at end of the current calendar month.
+
+    Algorithm:
+      1. Get the latest AccountMonthSnapshot (≤ current_month) for each included
+         checking/savings/wallet account.
+      2. Project each account's balance forward month-by-month using completed
+         transactions + recurring amounts until current_month.
+      3. Return the sum across all accounts.
+
+    Accounts with no snapshot at all contribute 0.
+    """
+    current_mo = today.replace(day=1)
+    cash_types = [Account.TYPE_CHECKING, Account.TYPE_SAVINGS, Account.TYPE_WALLET]
+
+    snap_qs = list(
+        AccountMonthSnapshot.objects
+        .filter(
+            account__user=user,
+            account__is_active=True,
+            account__include_in_total=True,
+            account__type__in=cash_types,
+            month__lte=current_mo,
+        )
+        .values("account_id", "month", "balance")
+        .order_by("account_id", "month")
+    )
+
+    if not snap_qs:
+        return Decimal("0")
+
+    # Latest snapshot per account
+    anchor_per_acc: dict = {}
+    for row in snap_qs:
+        s_mo = (row["month"] if isinstance(row["month"], date) else row["month"].date()).replace(day=1)
+        anchor_per_acc[row["account_id"]] = (s_mo, row["balance"])
+
+    # If all latest snapshots are already for current_mo, no projection needed
+    if all(m >= current_mo for m, _ in anchor_per_acc.values()):
+        return sum((bal for _, bal in anchor_per_acc.values()), Decimal("0"))
+
+    earliest_mo = min(m for m, _ in anchor_per_acc.values())
+    tx_start = _add_months(earliest_mo, 1)
+
+    # Net transactions per (account_id, month) from tx_start to current_mo
+    acc_net: dict = {}
+    for row in (
+        Transaction.objects
+        .filter(
+            account__user=user,
+            account__is_active=True,
+            account__include_in_total=True,
+            account__type__in=cash_types,
+            status=Transaction.STATUS_COMPLETED,
+            date__gte=tx_start,
+            date__lt=_add_months(current_mo, 1),
+            is_transfer=False,
+        )
+        .annotate(mo=TruncMonth("date"))
+        .values("account_id", "mo", "type")
+        .annotate(total=Sum("amount"))
+    ):
+        mo = (row["mo"] if isinstance(row["mo"], date) else row["mo"].date()).replace(day=1)
+        key = (row["account_id"], mo)
+        delta = row["total"] or Decimal("0")
+        acc_net[key] = acc_net.get(key, Decimal("0")) + (delta if row["type"] == "credit" else -delta)
+
+    rec_list = list(
+        RecurringTransaction.objects
+        .filter(
+            user=user,
+            is_active=True,
+            account__is_active=True,
+            account__include_in_total=True,
+            account__type__in=cash_types,
+        )
+    )
+
+    total = Decimal("0")
+    for aid, (snap_mo, snap_bal) in anchor_per_acc.items():
+        bal = snap_bal
+        mo = _add_months(snap_mo, 1)
+        while mo <= current_mo:
+            bal += acc_net.get((aid, mo), Decimal("0"))
+            for r in rec_list:
+                if r.account_id == aid:
+                    ramt = _amount_for_month(r, mo)
+                    bal += ramt if r.type == RecurringTransaction.TYPE_INCOME else -ramt
+            mo = _add_months(mo, 1)
+        total += bal
+
+    return total
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -223,9 +345,7 @@ def overview(request):
     first_name = request.user.first_name or request.user.email.split("@")[0]
 
     accounts = Account.objects.filter(user=request.user, is_active=True, include_in_total=True)
-    cash_balance = accounts.exclude(type=Account.TYPE_INVESTMENT).aggregate(
-        total=Sum("balance")
-    )["total"] or Decimal("0")
+    cash_balance = _projected_cash_balance(request.user, now.date())
 
     investments = Investment.objects.filter(user=request.user)
     inv_value = sum(i.current_value for i in investments)
@@ -910,9 +1030,16 @@ def contas(request):
         account=OuterRef("pk")
     ).order_by("-month").values("balance")[:1]
 
+    latest_month_subq = AccountMonthSnapshot.objects.filter(
+        account=OuterRef("pk")
+    ).order_by("-month").values("month")[:1]
+
     all_accounts = list(
         Account.objects.filter(user=request.user)
-        .annotate(latest_balance=Subquery(latest_balance_subq))
+        .annotate(
+            latest_balance=Subquery(latest_balance_subq),
+            latest_month=Subquery(latest_month_subq),
+        )
         .order_by("type", "name")
         .prefetch_related(
             Prefetch("monthly_snapshots", queryset=AccountMonthSnapshot.objects.order_by("-month"))
@@ -1154,7 +1281,7 @@ def projecao(request):
     now = _now_br()
     current_month = now.replace(day=1).date()
 
-    def _int_param(key, default, lo=1, hi=60):
+    def _int_param(key, default, lo=1, hi=600):
         try:
             return max(lo, min(hi, int(request.GET.get(key, default))))
         except (ValueError, TypeError):
@@ -1288,10 +1415,18 @@ def projecao(request):
         per_acc_names.setdefault(_tx.account_id, _tx.account.name)
         per_acc_colors.setdefault(_tx.account_id, _tx.account.color)
 
-    recurring_list = list(RecurringTransaction.objects.filter(user=request.user, is_active=True))
+    recurring_list = list(
+        RecurringTransaction.objects.filter(user=request.user, is_active=True)
+        .select_related("account", "category")
+    )
     recurring_by_acc: dict = {}  # {account_id (or None): [RecurringTransaction]}
     for _r in recurring_list:
         recurring_by_acc.setdefault(_r.account_id, []).append(_r)
+        # Seed per-account name/colour from recurring accounts for accounts that may
+        # have no actual Transaction records yet.
+        if _r.account_id and _r.account:
+            per_acc_names.setdefault(_r.account_id, _r.account.name)
+            per_acc_colors.setdefault(_r.account_id, _r.account.color)
 
     def _fixed_for_month(mo, tx_type):
         total = Decimal("0")
@@ -1304,11 +1439,7 @@ def projecao(request):
     proj_fixed_income = _fixed_for_month(current_month, RecurringTransaction.TYPE_INCOME)
     proj_fixed_expense = _fixed_for_month(current_month, RecurringTransaction.TYPE_EXPENSE)
 
-    anchor = (
-        Account.objects.filter(user=request.user, is_active=True, include_in_total=True)
-        .aggregate(t=Sum("balance"))["t"]
-        or Decimal("0")
-    )
+    anchor = _projected_cash_balance(request.user, now.date())
 
     def _get(mo, typ, recurring):
         return actual.get((mo, typ, recurring), Decimal("0"))
@@ -1427,6 +1558,9 @@ def projecao(request):
                 continue  # First snapshot for this account (or a gap) — no warning
             checked_any = True
             acc_net = acc_month_net.get((aid, mo), Decimal("0"))
+            for _r in recurring_by_acc.get(aid, []):
+                _ramt = _amount_for_month(_r, mo)
+                acc_net += _ramt if _r.type == RecurringTransaction.TYPE_INCOME else -_ramt
             diff = curr_bal - (prev_bal + acc_net)
             if abs(diff) >= Decimal("0.01"):
                 batimento_issues.append({
@@ -1466,7 +1600,12 @@ def projecao(request):
         else:
             end_balance = running_balance + net
             for _aid in list(acc_last_known.keys()):
-                acc_last_known[_aid] += acc_month_net.get((_aid, mo), Decimal("0"))
+                _rec_net = sum(
+                    (_amount_for_month(_r, mo) if _r.type == RecurringTransaction.TYPE_INCOME
+                     else -_amount_for_month(_r, mo))
+                    for _r in recurring_by_acc.get(_aid, [])
+                )
+                acc_last_known[_aid] += acc_month_net.get((_aid, mo), Decimal("0")) + _rec_net
 
         running_balance = end_balance
 
@@ -1475,8 +1614,10 @@ def projecao(request):
         for (_dk, _dm) in tx_by_acc_month:
             if _dm == mo:
                 _drill_aids.add(_dk)
-        if row["is_future"]:
-            _drill_aids.update(_a for _a in recurring_by_acc if _a is not None)
+        # Include recurring-only accounts for all months (not just future)
+        for _a, _recs in recurring_by_acc.items():
+            if _a is not None and any(_amount_for_month(_r, mo) for _r in _recs):
+                _drill_aids.add(_a)
 
         def _build_drill_entries(items_iter, is_future_row, acc_id):
             _run = opening_bal.get(acc_id)  # None when account has no prior snapshot
@@ -1515,6 +1656,21 @@ def projecao(request):
                     ))
             else:
                 _raw = []
+                # Recurring projected amounts for this account/month.
+                # Use computed expected date so past/current rows show a real date.
+                for _r in sorted(recurring_by_acc.get(_did, []), key=lambda r: r.name):
+                    _amt = _amount_for_month(_r, mo)
+                    if not _amt:
+                        continue
+                    _income = _r.type == RecurringTransaction.TYPE_INCOME
+                    _raw.append((
+                        _amt if _income else Decimal("0"),
+                        Decimal("0") if _income else _amt,
+                        _proj_date(_r, mo), _r.name, True,
+                        _r.category.name if _r.category else None,
+                        False,
+                    ))
+                # Actual transaction records
                 for _tx in tx_by_acc_month.get((_did, mo), []):
                     _isc = _tx.type == Transaction.TYPE_CREDIT
                     _raw.append((
@@ -1524,6 +1680,8 @@ def projecao(request):
                         _tx.category.name if _tx.category else None,
                         _tx.is_transfer,
                     ))
+                # Sort: actual transactions (have date) first; recurring projections last
+                _raw.sort(key=lambda x: (x[2] is None, x[2] or date.min))
             _entries = _build_drill_entries(_raw, row["is_future"], _did)
             _tc = sum(e["credit"] for e in _entries)
             _td = sum(e["debit"] for e in _entries)
@@ -1538,36 +1696,37 @@ def projecao(request):
                 "opening_balance": opening_bal.get(_did),
             })
 
-        if row["is_future"]:
-            _unassigned = [
-                _r for _r in recurring_by_acc.get(None, [])
-                if _amount_for_month(_r, mo)
-            ]
-            if _unassigned:
-                _raw = []
-                for _r in sorted(_unassigned, key=lambda r: r.name):
-                    _amt = _amount_for_month(_r, mo)
-                    _income = _r.type == RecurringTransaction.TYPE_INCOME
-                    _raw.append((
-                        _amt if _income else Decimal("0"),
-                        Decimal("0") if _income else _amt,
-                        None, _r.name, True,
-                        _r.category.name if _r.category else None,
-                        False,
-                    ))
-                _entries = _build_drill_entries(_raw, True, None)
-                _tc = sum(e["credit"] for e in _entries)
-                _td = sum(e["debit"] for e in _entries)
-                drill_accounts.append({
-                    "id": None,
-                    "name": "Sem custódia",
-                    "color": "#94A3B8",
-                    "txs": _entries,
-                    "total_credit": _tc,
-                    "total_debit": _td,
-                    "total_net": _tc - _td,
-                    "opening_balance": None,
-                })
+        # Unassigned recurring (no account) — shown for all months, not just future
+        _unassigned = [
+            _r for _r in recurring_by_acc.get(None, [])
+            if _amount_for_month(_r, mo)
+        ]
+        if _unassigned:
+            _raw = []
+            for _r in sorted(_unassigned, key=lambda r: r.name):
+                _amt = _amount_for_month(_r, mo)
+                _income = _r.type == RecurringTransaction.TYPE_INCOME
+                _proj_d = None if row["is_future"] else _proj_date(_r, mo)
+                _raw.append((
+                    _amt if _income else Decimal("0"),
+                    Decimal("0") if _income else _amt,
+                    _proj_d, _r.name, True,
+                    _r.category.name if _r.category else None,
+                    False,
+                ))
+            _entries = _build_drill_entries(_raw, row["is_future"], None)
+            _tc = sum(e["credit"] for e in _entries)
+            _td = sum(e["debit"] for e in _entries)
+            drill_accounts.append({
+                "id": None,
+                "name": "Sem custódia",
+                "color": "#94A3B8",
+                "txs": _entries,
+                "total_credit": _tc,
+                "total_debit": _td,
+                "total_net": _tc - _td,
+                "opening_balance": None,
+            })
 
         row["end_balance"] = end_balance
         row["inv_result"] = inv_result
@@ -1583,8 +1742,8 @@ def projecao(request):
 
     chart_data = json.dumps({
         "labels": [r["label"] for r in rows],
-        "income": [float(r["total_income"]) for r in rows],
-        "expense": [float(r["total_expense"]) for r in rows],
+        "net": [float(r["net"]) for r in rows],
+        "inv_result": [float(r["inv_result"]) if r["inv_result"] is not None else None for r in rows],
         "balance": [float(r["end_balance"]) for r in rows],
         "types": [
             "current" if r["is_current"] else "future" if r["is_future"] else "past"

@@ -160,7 +160,7 @@
               </div>
               <div class="flex flex-shrink-0 items-center gap-1 ml-3">
                 <p class="text-sm font-bold text-solve mr-2">R$&nbsp;{{ r.amount|brl }}</p>
-                <button onclick="openEditFixo({{ r.pk }}, '{{ r.name|escapejs }}', '{{ r.amount }}', '{{ r.type }}', '{{ r.frequency }}', '{{ r.start_date|date:'Y-m-d' }}', '{{ r.account.pk|default:'' }}', '{{ r.day_of_month|default:'' }}', '{{ r.day_of_week|default:'' }}', '{{ r.category.pk|default:'' }}', '{{ r.end_date|date:"Y-m-d"|default:"" }}', '{{ r.goal.pk|default:"" }}')"
+                <button onclick="openEditFixo({{ r.pk }}, '{{ r.name|escapejs }}', '{{ r.amount|stringformat:"s" }}', '{{ r.type }}', '{{ r.frequency }}', '{{ r.start_date|date:'Y-m-d' }}', '{{ r.account.pk|default:'' }}', '{{ r.day_of_month|default:'' }}', '{{ r.day_of_week|default:'' }}', '{{ r.category.pk|default:'' }}', '{{ r.end_date|date:"Y-m-d"|default:"" }}', '{{ r.goal.pk|default:"" }}')"
                         class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke transition-colors hover:bg-slate-100 hover:text-obsidian">
                   <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -202,7 +202,7 @@
               </div>
               <div class="flex flex-shrink-0 items-center gap-1 ml-3">
                 <p class="text-sm font-bold text-red-500 mr-2">R$&nbsp;{{ r.amount|brl }}</p>
-                <button onclick="openEditFixo({{ r.pk }}, '{{ r.name|escapejs }}', '{{ r.amount }}', '{{ r.type }}', '{{ r.frequency }}', '{{ r.start_date|date:'Y-m-d' }}', '{{ r.account.pk|default:'' }}', '{{ r.day_of_month|default:'' }}', '{{ r.day_of_week|default:'' }}', '{{ r.category.pk|default:'' }}', '{{ r.end_date|date:"Y-m-d"|default:"" }}', '{{ r.goal.pk|default:"" }}')"
+                <button onclick="openEditFixo({{ r.pk }}, '{{ r.name|escapejs }}', '{{ r.amount|stringformat:"s" }}', '{{ r.type }}', '{{ r.frequency }}', '{{ r.start_date|date:'Y-m-d' }}', '{{ r.account.pk|default:'' }}', '{{ r.day_of_month|default:'' }}', '{{ r.day_of_week|default:'' }}', '{{ r.category.pk|default:'' }}', '{{ r.end_date|date:"Y-m-d"|default:"" }}', '{{ r.goal.pk|default:"" }}')"
                         class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke transition-colors hover:bg-slate-100 hover:text-obsidian">
                   <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -349,7 +349,7 @@
               {% if r.type == 'income' %}+{% else %}-{% endif %}R$&nbsp;{{ r.amount|brl }}
             </p>
             <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onclick="openEditFixo({{ r.pk }}, '{{ r.name|escapejs }}', '{{ r.amount }}', '{{ r.type }}', '{{ r.frequency }}', '{{ r.start_date|date:'Y-m-d' }}', '{{ r.account.pk|default:'' }}', '{{ r.day_of_month|default:'' }}', '{{ r.day_of_week|default:'' }}', '{{ r.category.pk|default:'' }}', '{{ r.end_date|date:"Y-m-d"|default:"" }}', '{{ r.goal.pk|default:"" }}')"
+              <button onclick="openEditFixo({{ r.pk }}, '{{ r.name|escapejs }}', '{{ r.amount|stringformat:"s" }}', '{{ r.type }}', '{{ r.frequency }}', '{{ r.start_date|date:'Y-m-d' }}', '{{ r.account.pk|default:'' }}', '{{ r.day_of_month|default:'' }}', '{{ r.day_of_week|default:'' }}', '{{ r.category.pk|default:'' }}', '{{ r.end_date|date:"Y-m-d"|default:"" }}', '{{ r.goal.pk|default:"" }}')"
                       class="flex h-7 w-7 items-center justify-center rounded-lg text-smoke hover:bg-slate-100 hover:text-obsidian transition-colors">
                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
