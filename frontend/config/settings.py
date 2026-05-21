@@ -10,6 +10,11 @@ SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-only-change-in-produ
 DEBUG = env("DEBUG", default=True)
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
+# Railway injeta RAILWAY_PUBLIC_DOMAIN automaticamente — adiciona ao ALLOWED_HOSTS
+_railway_domain = env("RAILWAY_PUBLIC_DOMAIN", default="")
+if _railway_domain and _railway_domain not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_railway_domain)
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
