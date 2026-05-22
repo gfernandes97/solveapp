@@ -22,6 +22,25 @@
       {% endif %}
 
       {% for field in form %}
+      {% if field.html_name == "lgpd_consent" %}
+      <div class="rounded-lg border {% if field.errors %}border-red-300 bg-red-50{% else %}border-slate-200 bg-slate-50{% endif %} px-4 py-3">
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox"
+                 name="{{ field.html_name }}"
+                 id="{{ field.id_for_label }}"
+                 {% if field.value %}checked{% endif %}
+                 class="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-slate-300 text-solve accent-solve" />
+          <span class="text-xs text-smoke leading-relaxed">
+            Li e aceito os
+            <a href="{% url 'terms' %}" target="_blank" class="font-semibold text-signal hover:underline">Termos de Uso</a>
+            e a
+            <a href="{% url 'privacy' %}" target="_blank" class="font-semibold text-signal hover:underline">Política de Privacidade</a>,
+            incluindo o tratamento dos meus dados conforme a LGPD.
+          </span>
+        </label>
+        {% if field.errors %}<p class="mt-1.5 text-xs text-red-600">{{ field.errors|join:", " }}</p>{% endif %}
+      </div>
+      {% else %}
       <div class="space-y-1">
         <label class="text-sm font-medium text-obsidian" for="{{ field.id_for_label }}">{{ field.label }}</label>
         <input type="{{ field.field.widget.input_type }}"
@@ -31,19 +50,13 @@
                class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-solve focus:ring-2 focus:ring-solve/20" />
         {% if field.errors %}<p class="text-xs text-red-600">{{ field.errors|join:", " }}</p>{% endif %}
       </div>
+      {% endif %}
       {% endfor %}
 
       <button type="submit"
               class="w-full rounded-md bg-solve py-2.5 text-sm font-bold text-obsidian hover:bg-solve-light transition-colors">
         Criar conta grátis
       </button>
-
-      <p class="text-center text-xs text-smoke">
-        Ao criar uma conta você concorda com os
-        <a href="#" class="text-solve hover:underline">Termos de uso</a>
-        e a
-        <a href="#" class="text-solve hover:underline">Política de privacidade</a>.
-      </p>
     </div>
   </form>
 </div>

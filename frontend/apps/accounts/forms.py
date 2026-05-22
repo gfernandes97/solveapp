@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 class LoginForm(AuthenticationForm):
@@ -44,3 +45,24 @@ class RegisterForm(UserCreationForm):
         if commit:
             user.save()
         return user
+
+
+class LGPDSignupForm(forms.Form):
+    """
+    Formulário complementar ao signup do allauth (ACCOUNT_SIGNUP_FORM_CLASS).
+    Adiciona checkbox de consentimento explícito exigido pelo Art. 8º da LGPD.
+    O timestamp é gravado pelo sinal user_signed_up em signals.py.
+    """
+
+    lgpd_consent = forms.BooleanField(
+        required=True,
+        label="Li e aceito os Termos de Uso e a Política de Privacidade",
+        error_messages={
+            "required": "Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar uma conta."
+        },
+    )
+
+    def signup(self, request, user):
+        pass
+
+

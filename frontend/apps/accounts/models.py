@@ -24,6 +24,13 @@ class UserProfile(models.Model):
         max_length=20, choices=STEP_CHOICES, default=STEP_PLAN
     )
     onboarding_completed = models.BooleanField(default=False)
+    # LGPD — account deletion with 30-day grace period
+    pending_deletion = models.BooleanField(default=False)
+    deletion_scheduled_at = models.DateTimeField(null=True, blank=True)
+    # LGPD — consent tracking
+    lgpd_consent_at = models.DateTimeField(null=True, blank=True)
+    lgpd_consent_version = models.CharField(max_length=10, blank=True, default="1.0")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

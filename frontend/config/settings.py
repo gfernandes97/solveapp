@@ -133,6 +133,11 @@ LOGOUT_REDIRECT_URL = "/"
 # Redireciona direto ao Google sem página de confirmação intermediária
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
+# Desativa criação automática de conta social sem confirmação — força exibir
+# o formulário com checkbox LGPD para todo novo cadastro via OAuth
+SOCIALACCOUNT_AUTO_SIGNUP = False
+SOCIALACCOUNT_FORMS = {"signup": "apps.accounts.social_forms.SocialLGPDSignupForm"}
+
 ACCOUNT_SIGNUP_FORM_CLASS = "apps.accounts.forms.LGPDSignupForm"
 
 ACCOUNT_EMAIL_REQUIRED = True

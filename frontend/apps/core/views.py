@@ -74,6 +74,14 @@ def home(request):
     })
 
 
+def privacy(request):
+    return render(request, "legal/privacy.html")
+
+
+def terms(request):
+    return render(request, "legal/terms.html")
+
+
 def pricing(request):
     plans = [
         {

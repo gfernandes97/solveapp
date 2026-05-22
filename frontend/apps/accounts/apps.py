@@ -8,3 +8,8 @@ class AccountsConfig(AppConfig):
 
     def ready(self):
         import apps.accounts.signals  # noqa: F401
+
+        from allauth.account.signals import user_signed_up
+        from apps.accounts.signals import record_lgpd_consent
+
+        user_signed_up.connect(record_lgpd_consent)

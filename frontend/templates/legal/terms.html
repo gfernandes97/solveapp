@@ -1,0 +1,220 @@
+{% extends "marketing/base_marketing.html" %}
+{% block title %}Termos de Uso — Solve{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-slate-50">
+  <div class="mx-auto max-w-3xl px-6 py-16 sm:py-24">
+
+    <!-- Header -->
+    <div class="mb-10">
+      <a href="{% url 'home' %}" class="inline-flex items-center gap-2 text-sm font-medium text-signal hover:underline mb-6 block">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+        </svg>
+        Voltar
+      </a>
+      <h1 class="text-3xl font-black tracking-tight text-obsidian">Termos de Uso</h1>
+      <p class="mt-2 text-sm text-smoke">Última atualização: 21 de maio de 2026 · Versão 1.0</p>
+    </div>
+
+    <div class="space-y-8 text-sm text-obsidian leading-relaxed">
+
+      <!-- 1. Aceitação -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">1. Aceitação dos Termos</h2>
+        <p class="text-smoke">
+          Ao criar uma conta ou utilizar o Solve, você ("Usuário") declara ter lido, compreendido e
+          concordado com estes Termos de Uso e com a nossa
+          <a href="{% url 'privacy' %}" class="text-signal hover:underline">Política de Privacidade</a>.
+          Se você não concordar com qualquer parte destes Termos, não crie uma conta nem utilize o serviço.
+        </p>
+        <p class="mt-3 text-smoke">
+          O Solve é um produto da <strong>Solve Tecnologia Ltda.</strong>, inscrita no CNPJ sob o nº
+          00.000.000/0001-00, com sede em São Paulo/SP.
+        </p>
+      </section>
+
+      <!-- 2. Descrição do serviço -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">2. Descrição do Serviço</h2>
+        <p class="text-smoke">
+          O Solve é uma plataforma de gestão financeira pessoal que permite ao Usuário:
+        </p>
+        <ul class="mt-2 list-disc list-inside space-y-1 text-smoke">
+          <li>Registrar e acompanhar receitas, despesas e transferências</li>
+          <li>Gerenciar contas bancárias, de crédito e de investimento</li>
+          <li>Criar e monitorar metas financeiras</li>
+          <li>Visualizar projeções e análises do fluxo de caixa</li>
+          <li>Exportar seus dados financeiros</li>
+        </ul>
+        <p class="mt-3 text-smoke">
+          O Solve é uma ferramenta de organização pessoal. <strong>Não constitui consultoria financeira,
+          de investimentos ou contábil.</strong> As informações e projeções geradas são baseadas nos
+          dados inseridos pelo próprio Usuário.
+        </p>
+      </section>
+
+      <!-- 3. Elegibilidade -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">3. Elegibilidade</h2>
+        <p class="text-smoke">Para utilizar o Solve, você deve:</p>
+        <ul class="mt-2 list-disc list-inside space-y-1 text-smoke">
+          <li>Ter 18 (dezoito) anos ou mais</li>
+          <li>Ter capacidade legal para contratar segundo a legislação brasileira</li>
+          <li>Fornecer informações verdadeiras durante o cadastro</li>
+          <li>Manter a confidencialidade de suas credenciais de acesso</li>
+        </ul>
+      </section>
+
+      <!-- 4. Planos e pagamento -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">4. Planos, Preços e Pagamento</h2>
+
+        <h3 class="font-semibold text-obsidian mb-2">4.1 Planos disponíveis</h3>
+        <p class="text-smoke">
+          O Solve oferece planos gratuito e pagos (Essencial e Pro), descritos em
+          <a href="{% url 'pricing' %}" class="text-signal hover:underline">solve.app/pricing</a>.
+          As funcionalidades disponíveis em cada plano podem ser atualizadas com aviso prévio.
+        </p>
+
+        <h3 class="font-semibold text-obsidian mt-4 mb-2">4.2 Cobrança</h3>
+        <ul class="list-disc list-inside space-y-1 text-smoke">
+          <li>Os planos pagos são cobrados mensalmente de forma recorrente.</li>
+          <li>A cobrança ocorre no dia do início da assinatura ou no próximo dia útil.</li>
+          <li>Os preços são expressos em Reais (BRL) e incluem todos os tributos aplicáveis.</li>
+        </ul>
+
+        <h3 class="font-semibold text-obsidian mt-4 mb-2">4.3 Cancelamento</h3>
+        <p class="text-smoke">
+          Você pode cancelar sua assinatura a qualquer momento, sem multa ou fidelidade.
+          O cancelamento entra em vigor ao fim do período de faturamento já pago.
+          Após o cancelamento, seus dados ficam disponíveis por 30 dias para exportação.
+        </p>
+
+        <h3 class="font-semibold text-obsidian mt-4 mb-2">4.4 Reembolso</h3>
+        <p class="text-smoke">
+          Oferecemos garantia de 30 dias a partir da primeira cobrança. Se não estiver satisfeito,
+          solicite reembolso integral pelo e-mail
+          <a href="mailto:suporte@solve.com.br" class="text-signal hover:underline">suporte@solve.com.br</a>.
+        </p>
+      </section>
+
+      <!-- 5. Responsabilidades do usuário -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">5. Responsabilidades do Usuário</h2>
+        <p class="text-smoke">Ao utilizar o Solve, você concorda em:</p>
+        <ul class="mt-2 list-disc list-inside space-y-1 text-smoke">
+          <li>Inserir apenas dados verídicos e que você tem direito de utilizar</li>
+          <li>Não compartilhar suas credenciais de acesso com terceiros</li>
+          <li>Notificar imediatamente o Solve em caso de acesso não autorizado à sua conta</li>
+          <li>Não utilizar o serviço para fins ilegais, fraudulentos ou que prejudiquem terceiros</li>
+          <li>Não tentar acessar dados de outros usuários ou sistemas internos do Solve</li>
+          <li>Não realizar engenharia reversa, descompilar ou reproduzir o software sem autorização</li>
+        </ul>
+      </section>
+
+      <!-- 6. Propriedade intelectual -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">6. Propriedade Intelectual</h2>
+        <p class="text-smoke">
+          O Solve, incluindo sua marca, logo, código-fonte, design, textos e funcionalidades, é de
+          propriedade exclusiva da Solve Tecnologia Ltda. e protegido por leis de propriedade intelectual.
+        </p>
+        <p class="mt-3 text-smoke">
+          Os <strong>dados inseridos por você</strong> permanecem de sua propriedade. Concedemos a você
+          uma licença limitada, revogável e pessoal para usar o serviço. Você concede à Solve uma
+          licença para processar seus dados exclusivamente para prestar o serviço contratado.
+        </p>
+      </section>
+
+      <!-- 7. Disponibilidade -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">7. Disponibilidade do Serviço</h2>
+        <p class="text-smoke">
+          Nos esforçamos para manter o Solve disponível 24/7, mas não garantimos disponibilidade
+          ininterrupta. Manutenções programadas serão comunicadas com antecedência sempre que possível.
+          Não nos responsabilizamos por perdas decorrentes de indisponibilidade temporária do serviço.
+        </p>
+      </section>
+
+      <!-- 8. Limitação de responsabilidade -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">8. Limitação de Responsabilidade</h2>
+        <p class="text-smoke">
+          O Solve é fornecido "no estado em que se encontra". Na máxima extensão permitida pela lei:
+        </p>
+        <ul class="mt-2 list-disc list-inside space-y-1 text-smoke">
+          <li>Não garantimos que as análises e projeções reflitam com exatidão sua situação financeira real.</li>
+          <li>Não nos responsabilizamos por decisões financeiras tomadas com base nas informações do Solve.</li>
+          <li>Nossa responsabilidade total por danos diretos limita-se ao valor pago pelo Usuário nos últimos 3 meses.</li>
+          <li>Não somos responsáveis por danos indiretos, lucros cessantes ou perda de dados por culpa do Usuário.</li>
+        </ul>
+      </section>
+
+      <!-- 9. Rescisão -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">9. Rescisão e Suspensão</h2>
+        <p class="text-smoke">
+          Reservamo-nos o direito de suspender ou encerrar sua conta, sem aviso prévio, em caso de:
+        </p>
+        <ul class="mt-2 list-disc list-inside space-y-1 text-smoke">
+          <li>Violação destes Termos ou da Política de Privacidade</li>
+          <li>Uso fraudulento ou ilegal do serviço</li>
+          <li>Inadimplência por período superior a 30 dias</li>
+        </ul>
+        <p class="mt-3 text-smoke">
+          Em caso de encerramento por solicitação do Usuário, o processo de exclusão segue os prazos
+          descritos na seção 5 da nossa <a href="{% url 'privacy' %}" class="text-signal hover:underline">Política de Privacidade</a>.
+        </p>
+      </section>
+
+      <!-- 10. Alterações -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">10. Alterações nos Termos</h2>
+        <p class="text-smoke">
+          Podemos atualizar estes Termos periodicamente. Alterações materiais serão comunicadas
+          por e-mail com antecedência mínima de 10 dias. O uso continuado do serviço após a
+          entrada em vigor das alterações implica aceitação dos novos Termos.
+        </p>
+      </section>
+
+      <!-- 11. Lei aplicável e foro -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">11. Lei Aplicável e Foro</h2>
+        <p class="text-smoke">
+          Estes Termos são regidos pela legislação brasileira, incluindo o Código de Defesa do Consumidor
+          (Lei nº 8.078/1990), o Marco Civil da Internet (Lei nº 12.965/2014) e a LGPD (Lei nº 13.709/2018).
+        </p>
+        <p class="mt-3 text-smoke">
+          Fica eleito o foro da Comarca de São Paulo/SP para dirimir quaisquer controvérsias decorrentes
+          destes Termos, com renúncia expressa a qualquer outro.
+        </p>
+      </section>
+
+      <!-- 12. Contato -->
+      <section>
+        <h2 class="text-lg font-bold text-obsidian mb-3">12. Contato</h2>
+        <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-2">
+          <p class="text-sm text-smoke">Dúvidas sobre estes Termos? Entre em contato:</p>
+          <p class="text-sm">
+            <span class="font-semibold text-obsidian">Suporte:</span>
+            <a href="mailto:suporte@solve.com.br" class="text-signal hover:underline ml-1">suporte@solve.com.br</a>
+          </p>
+          <p class="text-sm">
+            <span class="font-semibold text-obsidian">Privacidade (DPO):</span>
+            <a href="mailto:privacidade@solve.com.br" class="text-signal hover:underline ml-1">privacidade@solve.com.br</a>
+          </p>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Footer links -->
+    <div class="mt-12 flex items-center justify-between text-xs text-smoke border-t border-slate-200 pt-6">
+      <a href="{% url 'privacy' %}" class="hover:text-obsidian">← Política de Privacidade</a>
+      <a href="{% url 'home' %}" class="hover:text-obsidian">Voltar ao início →</a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1778,4 +1778,5 @@ def projecao(request):
 
 @login_required
 def settings(request):
-    return render(request, "dashboard/settings.html")
+    profile = getattr(request.user, "profile", None)
+    return render(request, "dashboard/settings.html", {"profile": profile})
