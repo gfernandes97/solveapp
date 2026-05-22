@@ -2,10 +2,23 @@
 {% load static %}
 
 {% block body %}
-<div class="flex h-full">
+<div class="flex h-full" x-data="{ sidebarOpen: false }">
+
+  <!-- ─── Overlay mobile ─── -->
+  <div x-show="sidebarOpen"
+       x-transition:enter="transition-opacity ease-out duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition-opacity ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       @click="sidebarOpen = false"
+       class="fixed inset-0 z-20 bg-black/50 md:hidden"
+       style="display:none"></div>
 
   <!-- ─── Sidebar ─── -->
-  <aside class="hidden w-64 flex-shrink-0 flex-col bg-obsidian md:flex">
+  <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+         class="fixed inset-y-0 left-0 z-30 flex w-64 flex-shrink-0 flex-col bg-obsidian transition-transform duration-200 md:relative md:translate-x-0 md:flex">
 
     <!-- Logo -->
     <div class="flex h-16 items-center border-b border-white/10 px-6">
@@ -116,17 +129,18 @@
   <div class="flex flex-1 flex-col overflow-hidden">
 
     <!-- Top header -->
-    <header class="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6">
+    <header class="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-100 bg-white px-4 md:px-6">
       <div class="flex items-center gap-3">
-        <!-- Mobile: logo -->
-        <a href="{% url 'dashboard' %}" class="flex items-center gap-2 md:hidden">
-          <svg class="h-7 w-7 text-solve" viewBox="0 0 24 24" fill="none">
-            <path d="M20.5 8.9A9 9 0 1 1 15.8 3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <line x1="8" y1="16" x2="20.2" y2="3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <polyline points="17.8,4.5 20.2,3.8 19.6,6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <!-- Mobile: hamburguer -->
+        <button @click="sidebarOpen = true"
+                class="rounded-lg p-2 text-smoke transition-colors hover:bg-slate-100 md:hidden"
+                aria-label="Abrir menu">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
-        </a>
-        <span class="text-sm font-semibold text-smoke md:hidden">{% block header_title %}Dashboard{% endblock %}</span>
+        </button>
+        <span class="text-sm font-semibold text-obsidian md:hidden">{% block header_title %}Dashboard{% endblock %}</span>
+        <span class="hidden text-sm font-semibold text-obsidian md:block">{% block header_title_desktop %}{% endblock %}</span>
       </div>
       <div class="flex items-center gap-2">
         <button class="rounded-lg p-2 text-smoke transition-colors hover:bg-slate-100" aria-label="Notificações">

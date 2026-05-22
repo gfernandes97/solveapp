@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Solve{% endblock %} | Solve — Agora você sabe.</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -25,5 +26,40 @@
 </head>
 <body class="h-full bg-white text-slate-900 antialiased">
   {% block body %}{% endblock %}
+
+  <!-- Banner de cookies (LGPD Art. 8º) -->
+  <div id="cookie-banner"
+       class="fixed bottom-0 left-0 right-0 z-50 hidden border-t border-slate-200 bg-white/95 backdrop-blur-sm shadow-lg">
+    <div class="mx-auto flex max-w-5xl flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-start gap-3">
+        <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-solar" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <p class="text-sm text-smoke">
+          Usamos apenas cookies essenciais para manter sua sessão segura — nada de rastreamento ou publicidade.
+          <a href="{% url 'privacy' %}#9" class="font-semibold text-signal hover:underline ml-1">Saiba mais</a>
+        </p>
+      </div>
+      <button id="cookie-accept"
+              class="flex-shrink-0 rounded-lg bg-solve px-4 py-2 text-sm font-bold text-obsidian transition-colors hover:bg-solve-light">
+        Entendido
+      </button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var KEY = 'solve_cookie_ok';
+      var banner = document.getElementById('cookie-banner');
+      if (!localStorage.getItem(KEY)) {
+        banner.classList.remove('hidden');
+      }
+      document.getElementById('cookie-accept').addEventListener('click', function () {
+        localStorage.setItem(KEY, '1');
+        banner.classList.add('hidden');
+      });
+    })();
+  </script>
 </body>
 </html>
