@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "apps.subscriptions",
     "apps.finances",
     "apps.dashboard",
+    "anymail",
 ]
 
 MIDDLEWARE = [
@@ -164,14 +165,13 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 # ── E-mail ────────────────────────────────────────────────────────────────────
-# Dev: imprime no console. Produção: setar EMAIL_BACKEND + SMTP vars
+# Dev: imprime no console
+# Produção: anymail com Resend API (HTTPS, sem bloqueio de porta SMTP)
 EMAIL_BACKEND = env(
     "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
 )
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Solve <noreply@solve.app>")
-EMAIL_HOST = env("EMAIL_HOST", default="localhost")
-EMAIL_PORT = env.int("EMAIL_PORT", default=25)
-EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
-EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
-EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+
+ANYMAIL = {
+    "RESEND_API_KEY": env("RESEND_API_KEY", default=""),
+}
