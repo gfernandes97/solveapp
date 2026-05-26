@@ -1,27 +1,30 @@
 #!/bin/sh
-set -e
+set -ex
 
+echo "=== SOLVE STARTUP ==="
+echo "PORT=${PORT:-8000}"
+echo "DATABASE_URL set: $([ -n "$DATABASE_URL" ] && echo YES || echo NO)"
+echo "RAILWAY_ENVIRONMENT=${RAILWAY_ENVIRONMENT:-not-set}"
+
+echo "--- migrate ---"
 python manage.py migrate --noinput
-python manage.py collectstatic --noinput
 
-# Cria superusuário se DJANGO_SUPERUSER_EMAIL estiver definido e não existir nenhum superuser
-if [ -n "$DJANGO_SUPERUSER_EMAIL" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
-    python manage.py shell -c "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-import os
-email = os.environ['DJANGO_SUPERUSER_EMAIL']
-password = os.environ['DJANGO_SUPERUSER_PASSWORD']
-if not User.objects.filter(is_superuser=True).exists():
-    User.objects.create_superuser(username=email, email=email, password=password)
-    print('Superuser criado: ' + email)
-else:
-    print('Superuser ja existe, pulando.')
+echo "--- collectstatic ---"
+python manage.py collectstatic --noinput --clear
+
+echo "--- startup checks ---"
+python -c "
+import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings')
+import django; django.setup()
+from apps.dashboard import views, achievements, context_processors
+print('imports OK')
 "
-fi
 
+echo "--- starting gunicorn ---"
 exec gunicorn config.wsgi:application \
     --bind "0.0.0.0:${PORT:-8000}" \
-    --workers 2 \
+    --workers 1 \
     --timeout 120 \
-    --access-logfile -
+    --preload \
+    --access-logfile - \
+    --error-logfile -
