@@ -6,13 +6,20 @@
 <div class="space-y-6">
 
   <!-- Greeting -->
-  <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div>
       <h1 class="text-2xl font-black tracking-tight text-obsidian">
         {{ greeting }}, {{ first_name }}.
       </h1>
       <p class="mt-0.5 text-sm text-smoke">{{ today }}</p>
     </div>
+    <a href="{% url 'lancamentos' %}"
+       class="inline-flex items-center gap-2 self-start rounded-lg bg-solve px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-solve-dark sm:self-auto">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+      </svg>
+      Novo lançamento
+    </a>
   </div>
 
   <!-- Hero KPI — Patrimônio total -->
@@ -21,23 +28,23 @@
     <div class="pointer-events-none absolute inset-0 opacity-[0.03]"
          style="background-image: linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px);background-size:32px 32px"></div>
     <div class="relative">
-      <p class="text-sm font-medium text-white/50">Patrimônio total</p>
-      <p class="mt-2 font-black tracking-tight leading-none"><span class="text-2xl font-medium text-white/40">R$&nbsp;</span><span class="text-5xl text-white">{{ patrimonio|brl }}</span></p>
+      <p class="text-sm font-medium text-white/65">Patrimônio total</p>
+      <p class="mt-2 font-black tracking-tight leading-none"><span class="text-2xl font-medium text-white/60">R$&nbsp;</span><span class="text-5xl text-white">{{ patrimonio|brl }}</span></p>
       {% if not has_accounts %}
-      <p class="mt-1 text-xs text-white/30">Nenhuma conta adicionada ainda</p>
+      <p class="mt-1 text-xs text-white/50">Nenhuma conta adicionada ainda</p>
       {% endif %}
     </div>
     <div class="relative mt-6 flex flex-wrap gap-6 border-t border-white/10 pt-5">
       <div>
-        <p class="text-xs text-white/40">Receitas este mês</p>
+        <p class="text-xs text-white/60">Receitas este mês</p>
         <p class="mt-0.5 text-lg font-bold text-white">R$&nbsp;{{ income|brl }}</p>
       </div>
       <div>
-        <p class="text-xs text-white/40">Gastos este mês</p>
+        <p class="text-xs text-white/60">Gastos este mês</p>
         <p class="mt-0.5 text-lg font-bold text-white">R$&nbsp;{{ expense|brl }}</p>
       </div>
       <div>
-        <p class="text-xs text-white/40">Saldo do mês</p>
+        <p class="text-xs text-white/60">Saldo do mês</p>
         <p class="mt-0.5 text-lg font-bold {% if month_balance >= 0 %}text-solve{% else %}text-red-400{% endif %}">R$&nbsp;{{ month_balance|brl }}</p>
       </div>
     </div>
@@ -45,9 +52,9 @@
   </a>
 
   <!-- KPI cards -->
-  <div class="grid gap-4 sm:grid-cols-3">
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-    <a href="{% url 'lancamentos' %}?tab=entradas" class="block rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+    <a href="{% url 'lancamentos' %}?tab=entradas" class="block rounded-xl border border-slate-200 bg-white p-5 shadow transition-shadow hover:shadow-md">
       <div class="flex items-center justify-between">
         <p class="text-sm font-medium text-smoke">Receitas</p>
         <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-solve/10">
@@ -57,10 +64,10 @@
         </div>
       </div>
       <p class="mt-3 text-2xl font-black text-obsidian">R$&nbsp;{{ income|brl }}</p>
-      <p class="mt-1 text-xs text-smoke/60">Este mês</p>
+      <p class="mt-1 text-xs text-smoke">Este mês</p>
     </a>
 
-    <a href="{% url 'lancamentos' %}?tab=saidas" class="block rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+    <a href="{% url 'lancamentos' %}?tab=saidas" class="block rounded-xl border border-slate-200 bg-white p-5 shadow transition-shadow hover:shadow-md">
       <div class="flex items-center justify-between">
         <p class="text-sm font-medium text-smoke">Gastos</p>
         <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50">
@@ -70,10 +77,10 @@
         </div>
       </div>
       <p class="mt-3 text-2xl font-black text-obsidian">R$&nbsp;{{ expense|brl }}</p>
-      <p class="mt-1 text-xs text-smoke/60">Este mês</p>
+      <p class="mt-1 text-xs text-smoke">Este mês</p>
     </a>
 
-    <a href="{% url 'metas' %}" class="block rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+    <a href="{% url 'metas' %}" class="block rounded-xl border border-slate-200 bg-white p-5 shadow transition-shadow hover:shadow-md">
       <div class="flex items-center justify-between">
         <p class="text-sm font-medium text-smoke">Metas ativas</p>
         <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-signal/10">
@@ -83,15 +90,59 @@
         </div>
       </div>
       <p class="mt-3 text-2xl font-black text-obsidian">{{ goals_count }}</p>
-      <p class="mt-1 text-xs text-smoke/60">{% if goals_count == 0 %}Nenhuma meta criada{% else %}em andamento{% endif %}</p>
+      <p class="mt-1 text-xs text-smoke">{% if goals_count == 0 %}Nenhuma meta criada{% else %}em andamento{% endif %}</p>
+    </a>
+
+    <a href="{% url 'lancamentos' %}?tab=saidas" class="block rounded-xl border border-slate-200 bg-white p-5 shadow transition-shadow hover:shadow-md">
+      <div class="flex items-center justify-between">
+        <p class="text-sm font-medium text-smoke">Gasto hoje</p>
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-obsidian/5">
+          <svg class="h-4 w-4 text-obsidian/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+      </div>
+      <p class="mt-3 text-2xl font-black {% if today_expense > 0 %}text-red-500{% else %}text-obsidian{% endif %}">R$&nbsp;{{ today_expense|brl }}</p>
+      <p class="mt-1 text-xs text-smoke">Hoje</p>
     </a>
 
   </div>
 
+  {% if credit_cards %}
+  <!-- Credit card usage -->
+  <div class="rounded-xl border border-slate-200 bg-white p-5 shadow">
+    <h3 class="mb-4 font-semibold text-obsidian">Limite dos cartões</h3>
+    <div class="space-y-4">
+      {% for acc in credit_cards %}
+      <div>
+        <div class="mb-1.5 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="h-2.5 w-2.5 flex-shrink-0 rounded-full" style="background:{{ acc.color }}"></span>
+            <span class="text-sm font-medium text-obsidian">{{ acc.name }}</span>
+            {% if acc.bank_name %}<span class="text-xs text-smoke">· {{ acc.bank_name }}</span>{% endif %}
+          </div>
+          <div class="text-sm">
+            <span class="font-bold {% if acc.usage_pct >= 80 %}text-red-500{% elif acc.usage_pct >= 50 %}text-solar{% else %}text-obsidian{% endif %}">R$&nbsp;{{ acc.usage_amount|brl }}</span>
+            <span class="text-smoke/80"> / R$&nbsp;{{ acc.credit_limit|brl }}</span>
+          </div>
+        </div>
+        <div class="relative h-2 w-full overflow-hidden rounded-full bg-slate-100">
+          <div class="absolute inset-y-0 left-0 h-full rounded-full transition-all {{ acc.bar_color }}"
+               style="width:{{ acc.usage_pct }}%"></div>
+        </div>
+        <p class="mt-1 text-xs {% if acc.usage_pct >= 80 %}font-semibold text-red-400{% elif acc.usage_pct >= 50 %}text-solar{% else %}text-smoke{% endif %}">
+          {{ acc.usage_pct }}% utilizado{% if acc.closing_day %} · fecha dia {{ acc.closing_day }}{% endif %}
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <div class="grid gap-6 lg:grid-cols-2">
 
     <!-- Gastos por categoria -->
-    <div class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
       <h3 class="font-semibold text-obsidian">Gastos por categoria</h3>
       <p class="text-sm text-smoke">Este mês</p>
       {% if exp_cat_data %}
@@ -128,7 +179,7 @@
     </div>
 
     <!-- Lançamentos recentes -->
-    <div class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
       <div class="flex items-center justify-between">
         <h3 class="font-semibold text-obsidian">Lançamentos recentes</h3>
         <a href="{% url 'lancamentos' %}" class="text-sm font-medium text-solve hover:text-solve-dark transition-colors">Ver todos</a>
@@ -178,7 +229,7 @@
 
   <!-- Progressão das metas -->
   {% if goals %}
-  <div class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+  <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
     <div class="flex items-center justify-between mb-5">
       <div>
         <h3 class="font-semibold text-obsidian">Progressão das metas</h3>
@@ -194,12 +245,12 @@
             <div class="h-2.5 w-2.5 rounded-full flex-shrink-0 mt-0.5" style="background-color:{{ g.color }}"></div>
             <p class="text-sm font-semibold text-obsidian">{{ g.name }}</p>
           </div>
-          <p class="text-xs text-smoke/60 flex-shrink-0">Meta: R$&nbsp;{{ g.target_amount|brl }}</p>
+          <p class="text-xs text-smoke flex-shrink-0">Meta: R$&nbsp;{{ g.target_amount|brl }}</p>
         </div>
         <!-- Executed bar -->
         <div class="relative h-2 w-full overflow-hidden rounded-full bg-slate-100">
           {% if g.provisioned_pct %}
-          <div class="absolute inset-y-0 left-0 rounded-full transition-all opacity-25" style="width:{{ g.provisioned_pct }}%;background-color:{{ g.color }}"></div>
+          <div class="absolute inset-y-0 left-0 rounded-full transition-all opacity-50" style="width:{{ g.provisioned_pct }}%;background-color:{{ g.color }}"></div>
           {% endif %}
           <div class="absolute inset-y-0 left-0 rounded-full transition-all" style="width:{{ g.executed_pct }}%;background-color:{{ g.color }}"></div>
         </div>
@@ -207,16 +258,16 @@
         <div class="mt-1 flex items-center gap-4">
           <p class="text-xs tabular-nums">
             <span class="font-bold" style="color:{{ g.color }}">{{ g.executed_pct }}%</span>
-            <span class="text-smoke/60"> executado · R$&nbsp;{{ g.executed_amount|brl }}</span>
+            <span class="text-smoke"> executado · R$&nbsp;{{ g.executed_amount|brl }}</span>
           </p>
           {% if g.provisioned_pct > g.executed_pct %}
-          <p class="text-xs tabular-nums text-smoke/40">
+          <p class="text-xs tabular-nums text-smoke">
             {{ g.provisioned_pct }}% prov. · R$&nbsp;{{ g.provisioned_amount|brl }}
           </p>
           {% endif %}
         </div>
         {% if g.deadline %}
-        <p class="mt-0.5 text-xs text-smoke/40">Prazo: {{ g.deadline|date:"d/m/Y" }}</p>
+        <p class="mt-0.5 text-xs text-smoke">Prazo: {{ g.deadline|date:"d/m/Y" }}</p>
         {% endif %}
       </div>
       {% endfor %}
@@ -224,24 +275,83 @@
   </div>
   {% endif %}
 
-  <!-- Getting started callout -->
-  <div class="flex items-start gap-4 rounded-xl border border-solve/20 bg-solve/5 p-5">
-    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-solve/15">
-      <svg class="h-5 w-5 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+  {% if not has_accounts %}
+  <!-- Onboarding stepper — new user, no accounts yet -->
+  <div class="rounded-xl border border-solve/20 bg-solve/5 p-5">
+    <div class="mb-4 flex items-center gap-3">
+      <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-solve/15">
+        <svg class="h-5 w-5 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+        </svg>
+      </div>
+      <div>
+        <p class="font-bold text-obsidian">Configure sua conta em 3 passos</p>
+        <p class="text-xs text-smoke">Leva menos de 5 minutos para começar</p>
+      </div>
+    </div>
+    <ol class="space-y-2.5">
+      <li>
+        <a href="{% url 'contas' %}"
+           class="flex items-center gap-4 rounded-xl border border-solve/30 bg-white p-4 shadow transition-shadow hover:shadow-md">
+          <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-solve text-sm font-black text-white">1</div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-obsidian">Adicione sua conta bancária</p>
+            <p class="text-xs text-smoke">Conta corrente, poupança, carteira ou investimento</p>
+          </div>
+          <svg class="h-4 w-4 flex-shrink-0 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </li>
+      <li>
+        <div class="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 opacity-50">
+          <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-signal/15 text-sm font-black text-signal">2</div>
+          <div>
+            <p class="text-sm font-medium text-obsidian">Registre o saldo de cada conta</p>
+            <p class="text-xs text-smoke">Informe quanto você tem hoje em cada custódia</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 opacity-50">
+          <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-solar/15 text-sm font-black text-solar">3</div>
+          <div>
+            <p class="text-sm font-medium text-obsidian">Adicione seus lançamentos</p>
+            <p class="text-xs text-smoke">Receitas, gastos e transferências</p>
+          </div>
+        </div>
+      </li>
+    </ol>
+  </div>
+  {% elif not recent_txs %}
+  <!-- Has accounts but no transactions yet -->
+  <div class="flex items-start gap-4 rounded-xl border border-signal/20 bg-signal/5 p-5">
+    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-signal/15">
+      <svg class="h-5 w-5 text-signal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
       </svg>
     </div>
     <div>
-      <p class="font-semibold text-obsidian">Por onde começar?</p>
-      <p class="mt-0.5 text-sm text-smoke">Adicione sua primeira conta bancária e registre seus lançamentos. O Solve organiza tudo automaticamente — você só confere.</p>
-      <a href="{% url 'contas' %}" class="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-solve hover:text-solve-dark transition-colors">
-        Adicionar primeira conta
-        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-        </svg>
-      </a>
+      <p class="font-semibold text-obsidian">Conta adicionada com sucesso</p>
+      <p class="mt-0.5 text-sm text-smoke">Agora registre o saldo atual e adicione seus primeiros lançamentos para o Solve começar a trabalhar por você.</p>
+      <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <a href="{% url 'contas' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-signal transition-opacity hover:opacity-75">
+          Registrar saldo
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </a>
+        <span class="text-slate-300 hidden sm:block">|</span>
+        <a href="{% url 'lancamentos' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-solve transition-opacity hover:opacity-75">
+          Adicionar lançamento
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
     </div>
   </div>
+  {% endif %}
 
 </div>
 {% endblock %}

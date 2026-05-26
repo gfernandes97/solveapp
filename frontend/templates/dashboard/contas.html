@@ -6,19 +6,6 @@
 {% block content %}
 <div class="space-y-6">
 
-  {% if messages %}
-  <div class="space-y-2">
-    {% for message in messages %}
-    <div class="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-      <svg class="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
-      {{ message }}
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
   <!-- Page header -->
   <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
     <div>
@@ -42,7 +29,7 @@
     <p class="px-1 text-xs font-semibold uppercase tracking-wider text-smoke">Contas bancárias e carteiras</p>
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
     {% for acc in cash_accounts %}
-    <div class="flex flex-col rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+    <div class="flex flex-col rounded-2xl border border-slate-200 bg-white shadow overflow-hidden">
       <!-- Card body -->
       <div class="flex flex-col flex-1 p-4 gap-3">
         <!-- Top row: avatar + name + actions -->
@@ -56,19 +43,19 @@
                 {% if acc.type == 'checking' %}bg-signal/10 text-signal
                 {% elif acc.type == 'savings' %}bg-solve/10 text-solve
                 {% else %}bg-slate-100 text-smoke{% endif %}">{{ acc.get_type_display }}</span>
-              {% if acc.bank_name %}<span class="text-xs text-smoke/70">{{ acc.bank_name }}</span>{% endif %}
+              {% if acc.bank_name %}<span class="text-xs text-smoke">{{ acc.bank_name }}</span>{% endif %}
               {% if not acc.is_active %}<span class="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-400">Inativa</span>{% endif %}
             </div>
           </div>
           <!-- Edit + deactivate icons -->
           <div class="flex items-center gap-0.5 flex-shrink-0 -mt-0.5">
             <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }})"
-                    class="rounded-lg p-1.5 text-smoke/50 transition-colors hover:bg-slate-100 hover:text-obsidian" title="Editar conta">
+                    class="rounded-lg p-1.5 text-smoke/65 transition-colors hover:bg-slate-100 hover:text-obsidian" title="Editar conta">
               <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
             </button>
             <form method="post" action="{% url 'conta_excluir' acc.id %}" onsubmit="return confirm('Desativar a conta {{ acc.name|escapejs }}?')" class="inline">
               {% csrf_token %}
-              <button type="submit" class="rounded-lg p-1.5 text-smoke/50 transition-colors hover:bg-red-50 hover:text-red-500" title="Desativar conta">
+              <button type="submit" class="rounded-lg p-1.5 text-smoke/65 transition-colors hover:bg-red-50 hover:text-red-500" title="Desativar conta">
                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               </button>
             </form>
@@ -81,17 +68,17 @@
             R$&nbsp;{{ acc.latest_balance|brl }}
           </p>
           {% if acc.latest_month %}
-          <p class="mt-0.5 text-xs font-medium text-smoke/60">Saldo de {{ acc.latest_month|date:"M/Y" }}</p>
+          <p class="mt-0.5 text-xs font-medium text-smoke">Saldo de {{ acc.latest_month|date:"M/Y" }}</p>
           {% endif %}
           {% else %}
-          <p class="text-sm font-semibold text-smoke/40 italic">Sem saldo registrado</p>
-          <p class="mt-0.5 text-xs text-smoke/40">Registre o saldo do mês atual para começar</p>
+          <p class="text-sm font-semibold text-smoke italic">Sem saldo registrado</p>
+          <p class="mt-0.5 text-xs text-smoke">Registre o saldo do mês atual para começar</p>
           {% endif %}
         </div>
       </div>
       <!-- Card footer: register + history -->
       <div class="flex items-center justify-between border-t border-slate-100 px-3 py-2 bg-slate-50/50">
-        <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}')"
+        <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}', '{{ acc.color }}', {% if acc.latest_balance is not None %}'{{ acc.latest_balance }}'{% else %}null{% endif %}, {% if acc.latest_month %}'{{ acc.latest_month|date:"M/Y" }}'{% else %}null{% endif %})"
                 class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-solve transition-colors hover:bg-solve/10" title="Registrar saldo do mês">
           <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           Registrar saldo
@@ -106,32 +93,38 @@
       <div id="history-{{ acc.id }}" class="hidden border-t border-slate-100">
         {% with snaps=acc.monthly_snapshots.all %}
         {% if snaps %}
-        <table class="w-full text-sm">
-          <thead><tr class="border-b border-slate-50 text-left text-xs text-smoke bg-slate-50/50">
-            <th class="px-4 py-2 font-semibold">Mês</th>
-            <th class="px-4 py-2 text-right font-semibold">Saldo</th>
-            <th class="px-4 py-2 w-8"></th>
-          </tr></thead>
-          <tbody class="divide-y divide-slate-50">
-            {% for snap in snaps %}
-            <tr class="hover:bg-slate-50/50">
-              <td class="px-4 py-2 font-medium text-obsidian text-xs">{{ snap.month|date:"M/Y" }}</td>
-              <td class="px-4 py-2 text-right font-semibold text-xs tabular-nums {% if snap.balance >= 0 %}text-obsidian{% else %}text-red-500{% endif %}">R$&nbsp;{{ snap.balance|brl }}</td>
-              <td class="px-4 py-2 text-right">
-                <form method="post" action="{% url 'snapshot_excluir' snap.id %}" class="inline">
-                  {% csrf_token %}
-                  <button type="submit" class="text-smoke/40 hover:text-red-400 transition-colors" title="Remover">
-                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="divide-y divide-slate-50/80">
+          {% for snap in snaps %}
+          <div class="group flex items-center gap-3 px-4 py-3 hover:bg-slate-50/40 transition-colors"
+               data-balance="{{ snap.balance }}">
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-semibold text-obsidian capitalize">
+                {{ snap.month|date:"F" }} <span class="font-normal text-smoke/80">{{ snap.month|date:"Y" }}</span>
+              </p>
+              <p class="snapshot-delta mt-0.5 hidden text-xs font-medium"></p>
+            </div>
+            <p class="flex-shrink-0 text-sm font-black tabular-nums {% if snap.balance >= 0 %}text-obsidian{% else %}text-red-600{% endif %}">
+              R$&nbsp;{{ snap.balance|brl }}
+            </p>
+            <form method="post" action="{% url 'snapshot_excluir' snap.id %}">
+              {% csrf_token %}
+              <button type="submit" title="Remover"
+                      class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-smoke/30 opacity-0 transition-all hover:bg-red-50 hover:text-red-400 group-hover:opacity-100">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
         {% else %}
-        <div class="flex flex-col items-center gap-2 px-4 py-5 text-center">
-          <p class="text-xs text-smoke">Nenhum saldo registrado ainda.</p>
+        <div class="flex flex-col items-center gap-1.5 px-4 py-8 text-center">
+          <svg class="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+          <p class="text-xs font-medium text-smoke">Sem histórico</p>
+          <p class="text-xs text-smoke">Use "+ Registrar saldo" para começar.</p>
         </div>
         {% endif %}
         {% endwith %}
@@ -148,7 +141,7 @@
     <p class="px-1 text-xs font-semibold uppercase tracking-wider text-smoke">Cartões de crédito</p>
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
     {% for acc in credit_accounts %}
-    <div class="flex flex-col rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+    <div class="flex flex-col rounded-2xl border border-slate-200 bg-white shadow overflow-hidden">
       <div class="flex flex-col flex-1 p-4 gap-3">
         <div class="flex items-start gap-3">
           <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-base font-black text-white shadow-sm"
@@ -157,18 +150,18 @@
             <p class="font-bold text-obsidian leading-snug truncate">{{ acc.name }}</p>
             <div class="mt-1 flex items-center gap-1.5 flex-wrap">
               <span class="inline-flex rounded-full bg-solar/10 px-2 py-0.5 text-xs font-semibold text-solar">Crédito</span>
-              {% if acc.bank_name %}<span class="text-xs text-smoke/70">{{ acc.bank_name }}</span>{% endif %}
+              {% if acc.bank_name %}<span class="text-xs text-smoke">{{ acc.bank_name }}</span>{% endif %}
             </div>
-            {% if acc.closing_day %}<p class="mt-1 text-xs text-smoke/60">Fecha dia {{ acc.closing_day }} · Vence dia {{ acc.due_day }}</p>{% endif %}
+            {% if acc.closing_day %}<p class="mt-1 text-xs text-smoke">Fecha dia {{ acc.closing_day }} · Vence dia {{ acc.due_day }}</p>{% endif %}
           </div>
           <div class="flex items-center gap-0.5 flex-shrink-0 -mt-0.5">
             <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }})"
-                    class="rounded-lg p-1.5 text-smoke/50 transition-colors hover:bg-slate-100 hover:text-obsidian" title="Editar conta">
+                    class="rounded-lg p-1.5 text-smoke/65 transition-colors hover:bg-slate-100 hover:text-obsidian" title="Editar conta">
               <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
             </button>
             <form method="post" action="{% url 'conta_excluir' acc.id %}" onsubmit="return confirm('Desativar {{ acc.name|escapejs }}?')" class="inline">
               {% csrf_token %}
-              <button type="submit" class="rounded-lg p-1.5 text-smoke/50 transition-colors hover:bg-red-50 hover:text-red-500" title="Desativar conta">
+              <button type="submit" class="rounded-lg p-1.5 text-smoke/65 transition-colors hover:bg-red-50 hover:text-red-500" title="Desativar conta">
                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               </button>
             </form>
@@ -178,17 +171,17 @@
           {% if acc.latest_balance is not None %}
           <p class="text-xl font-black tabular-nums text-red-600">-R$&nbsp;{{ acc.latest_balance|brl }}</p>
           <div class="mt-0.5 flex items-center justify-between">
-            {% if acc.latest_month %}<p class="text-xs font-medium text-smoke/60">Fatura de {{ acc.latest_month|date:"M/Y" }}</p>{% endif %}
-            {% if acc.credit_limit %}<p class="text-xs text-smoke/50">Limite R$&nbsp;{{ acc.credit_limit|brl }}</p>{% endif %}
+            {% if acc.latest_month %}<p class="text-xs font-medium text-smoke">Fatura de {{ acc.latest_month|date:"M/Y" }}</p>{% endif %}
+            {% if acc.credit_limit %}<p class="text-xs text-smoke/65">Limite R$&nbsp;{{ acc.credit_limit|brl }}</p>{% endif %}
           </div>
           {% else %}
-          <p class="text-sm font-semibold text-smoke/40 italic">Sem fatura registrada</p>
-          <p class="mt-0.5 text-xs text-smoke/40">Registre a fatura do mês para começar</p>
+          <p class="text-sm font-semibold text-smoke italic">Sem fatura registrada</p>
+          <p class="mt-0.5 text-xs text-smoke">Registre a fatura do mês para começar</p>
           {% endif %}
         </div>
       </div>
       <div class="flex items-center justify-between border-t border-slate-100 px-3 py-2 bg-slate-50/50">
-        <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}')"
+        <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}', '{{ acc.color }}', {% if acc.latest_balance is not None %}'{{ acc.latest_balance }}'{% else %}null{% endif %}, {% if acc.latest_month %}'{{ acc.latest_month|date:"M/Y" }}'{% else %}null{% endif %})"
                 class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-solve transition-colors hover:bg-solve/10" title="Registrar fatura do mês">
           <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           Registrar fatura
@@ -202,32 +195,38 @@
       <div id="history-{{ acc.id }}" class="hidden border-t border-slate-100">
         {% with snaps=acc.monthly_snapshots.all %}
         {% if snaps %}
-        <table class="w-full text-sm">
-          <thead><tr class="border-b border-slate-50 text-left text-xs text-smoke bg-slate-50/50">
-            <th class="px-4 py-2 font-semibold">Mês</th>
-            <th class="px-4 py-2 text-right font-semibold">Fatura</th>
-            <th class="px-4 py-2 w-8"></th>
-          </tr></thead>
-          <tbody class="divide-y divide-slate-50">
-            {% for snap in snaps %}
-            <tr class="hover:bg-slate-50/50">
-              <td class="px-4 py-2 font-medium text-obsidian text-xs">{{ snap.month|date:"M/Y" }}</td>
-              <td class="px-4 py-2 text-right font-semibold text-xs tabular-nums text-red-500">R$&nbsp;{{ snap.balance|brl }}</td>
-              <td class="px-4 py-2 text-right">
-                <form method="post" action="{% url 'snapshot_excluir' snap.id %}" class="inline">
-                  {% csrf_token %}
-                  <button type="submit" class="text-smoke/40 hover:text-red-400 transition-colors">
-                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="divide-y divide-slate-50/80">
+          {% for snap in snaps %}
+          <div class="group flex items-center gap-3 px-4 py-3 hover:bg-slate-50/40 transition-colors"
+               data-balance="{{ snap.balance }}">
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-semibold text-obsidian capitalize">
+                {{ snap.month|date:"F" }} <span class="font-normal text-smoke/80">{{ snap.month|date:"Y" }}</span>
+              </p>
+              <p class="snapshot-delta mt-0.5 hidden text-xs font-medium"></p>
+            </div>
+            <p class="flex-shrink-0 text-sm font-black tabular-nums text-red-600">
+              R$&nbsp;{{ snap.balance|brl }}
+            </p>
+            <form method="post" action="{% url 'snapshot_excluir' snap.id %}">
+              {% csrf_token %}
+              <button type="submit" title="Remover"
+                      class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-smoke/30 opacity-0 transition-all hover:bg-red-50 hover:text-red-400 group-hover:opacity-100">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
         {% else %}
-        <div class="flex flex-col items-center gap-2 px-4 py-5 text-center">
-          <p class="text-xs text-smoke">Nenhuma fatura registrada ainda.</p>
+        <div class="flex flex-col items-center gap-1.5 px-4 py-8 text-center">
+          <svg class="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+          <p class="text-xs font-medium text-smoke">Sem histórico</p>
+          <p class="text-xs text-smoke">Use "+ Registrar fatura" para começar.</p>
         </div>
         {% endif %}
         {% endwith %}
@@ -244,7 +243,7 @@
     <p class="px-1 text-xs font-semibold uppercase tracking-wider text-smoke">Custódias de investimento</p>
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
     {% for acc in investment_accounts %}
-    <div class="flex flex-col rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+    <div class="flex flex-col rounded-2xl border border-slate-200 bg-white shadow overflow-hidden">
       <div class="flex flex-col flex-1 p-4 gap-3">
         <div class="flex items-start gap-3">
           <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-base font-black text-white shadow-sm"
@@ -253,17 +252,17 @@
             <p class="font-bold text-obsidian leading-snug truncate">{{ acc.name }}</p>
             <div class="mt-1 flex items-center gap-1.5 flex-wrap">
               <span class="inline-flex rounded-full bg-signal/10 px-2 py-0.5 text-xs font-semibold text-signal">Investimentos</span>
-              {% if acc.bank_name %}<span class="text-xs text-smoke/70">{{ acc.bank_name }}</span>{% endif %}
+              {% if acc.bank_name %}<span class="text-xs text-smoke">{{ acc.bank_name }}</span>{% endif %}
             </div>
           </div>
           <div class="flex items-center gap-0.5 flex-shrink-0 -mt-0.5">
             <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }})"
-                    class="rounded-lg p-1.5 text-smoke/50 transition-colors hover:bg-slate-100 hover:text-obsidian" title="Editar conta">
+                    class="rounded-lg p-1.5 text-smoke/65 transition-colors hover:bg-slate-100 hover:text-obsidian" title="Editar conta">
               <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
             </button>
             <form method="post" action="{% url 'conta_excluir' acc.id %}" onsubmit="return confirm('Desativar {{ acc.name|escapejs }}?')" class="inline">
               {% csrf_token %}
-              <button type="submit" class="rounded-lg p-1.5 text-smoke/50 transition-colors hover:bg-red-50 hover:text-red-500" title="Desativar conta">
+              <button type="submit" class="rounded-lg p-1.5 text-smoke/65 transition-colors hover:bg-red-50 hover:text-red-500" title="Desativar conta">
                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               </button>
             </form>
@@ -272,15 +271,15 @@
         <div class="rounded-xl bg-signal/5 px-4 py-3">
           {% if acc.latest_balance is not None %}
           <p class="text-xl font-black tabular-nums text-signal">R$&nbsp;{{ acc.latest_balance|brl }}</p>
-          {% if acc.latest_month %}<p class="mt-0.5 text-xs font-medium text-smoke/60">Patrimônio de {{ acc.latest_month|date:"M/Y" }}</p>{% endif %}
+          {% if acc.latest_month %}<p class="mt-0.5 text-xs font-medium text-smoke">Patrimônio de {{ acc.latest_month|date:"M/Y" }}</p>{% endif %}
           {% else %}
-          <p class="text-sm font-semibold text-smoke/40 italic">Sem valor registrado</p>
-          <p class="mt-0.5 text-xs text-smoke/40">Registre o patrimônio do mês para começar</p>
+          <p class="text-sm font-semibold text-smoke italic">Sem valor registrado</p>
+          <p class="mt-0.5 text-xs text-smoke">Registre o patrimônio do mês para começar</p>
           {% endif %}
         </div>
       </div>
       <div class="flex items-center justify-between border-t border-slate-100 px-3 py-2 bg-slate-50/50">
-        <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}')"
+        <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}', '{{ acc.color }}', {% if acc.latest_balance is not None %}'{{ acc.latest_balance }}'{% else %}null{% endif %}, {% if acc.latest_month %}'{{ acc.latest_month|date:"M/Y" }}'{% else %}null{% endif %})"
                 class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-solve transition-colors hover:bg-solve/10" title="Registrar valor do mês">
           <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           Registrar patrimônio
@@ -294,32 +293,38 @@
       <div id="history-{{ acc.id }}" class="hidden border-t border-slate-100">
         {% with snaps=acc.monthly_snapshots.all %}
         {% if snaps %}
-        <table class="w-full text-sm">
-          <thead><tr class="border-b border-slate-50 text-left text-xs text-smoke bg-slate-50/50">
-            <th class="px-4 py-2 font-semibold">Mês</th>
-            <th class="px-4 py-2 text-right font-semibold">Patrimônio</th>
-            <th class="px-4 py-2 w-8"></th>
-          </tr></thead>
-          <tbody class="divide-y divide-slate-50">
-            {% for snap in snaps %}
-            <tr class="hover:bg-slate-50/50">
-              <td class="px-4 py-2 font-medium text-obsidian text-xs">{{ snap.month|date:"M/Y" }}</td>
-              <td class="px-4 py-2 text-right font-semibold text-xs tabular-nums text-signal">R$&nbsp;{{ snap.balance|brl }}</td>
-              <td class="px-4 py-2 text-right">
-                <form method="post" action="{% url 'snapshot_excluir' snap.id %}" class="inline">
-                  {% csrf_token %}
-                  <button type="submit" class="text-smoke/40 hover:text-red-400 transition-colors">
-                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="divide-y divide-slate-50/80">
+          {% for snap in snaps %}
+          <div class="group flex items-center gap-3 px-4 py-3 hover:bg-slate-50/40 transition-colors"
+               data-balance="{{ snap.balance }}">
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-semibold text-obsidian capitalize">
+                {{ snap.month|date:"F" }} <span class="font-normal text-smoke/80">{{ snap.month|date:"Y" }}</span>
+              </p>
+              <p class="snapshot-delta mt-0.5 hidden text-xs font-medium"></p>
+            </div>
+            <p class="flex-shrink-0 text-sm font-black tabular-nums text-signal">
+              R$&nbsp;{{ snap.balance|brl }}
+            </p>
+            <form method="post" action="{% url 'snapshot_excluir' snap.id %}">
+              {% csrf_token %}
+              <button type="submit" title="Remover"
+                      class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-smoke/30 opacity-0 transition-all hover:bg-red-50 hover:text-red-400 group-hover:opacity-100">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
         {% else %}
-        <div class="flex flex-col items-center gap-2 px-4 py-5 text-center">
-          <p class="text-xs text-smoke">Nenhum valor registrado ainda.</p>
+        <div class="flex flex-col items-center gap-1.5 px-4 py-8 text-center">
+          <svg class="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+          <p class="text-xs font-medium text-smoke">Sem histórico</p>
+          <p class="text-xs text-smoke">Use "+ Registrar patrimônio" para começar.</p>
         </div>
         {% endif %}
         {% endwith %}
@@ -409,7 +414,7 @@
                  class="ml-2 h-8 w-10 cursor-pointer rounded border border-slate-200 p-0.5">
         </div>
       </div>
-      <p class="text-xs text-smoke/60 rounded-lg bg-slate-50 px-3 py-2">
+      <p class="text-xs text-smoke rounded-lg bg-slate-50 px-3 py-2">
         Saldos são registrados mês a mês diretamente na conta — clique no ícone de calendário após criar.
       </p>
       <button type="submit" class="w-full rounded-lg bg-solve py-3 text-sm font-black text-white transition-colors hover:bg-solve-dark">
@@ -493,38 +498,79 @@
 
 <!-- ─── Modal: Registrar Saldo do Mês ─── -->
 <div id="modal-snapshot" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-  <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="font-black text-obsidian">Registrar saldo</h2>
-        <p id="snapshot-account-name" class="text-xs text-smoke mt-0.5"></p>
+  <div class="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden">
+
+    <!-- Account context header -->
+    <div id="snapshot-header" class="px-6 pt-5 pb-4 border-b border-black/5">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div id="snapshot-avatar"
+               class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-sm font-black text-white shadow-sm">
+          </div>
+          <div>
+            <p id="snapshot-account-name" class="font-bold text-obsidian leading-snug"></p>
+            <p id="snapshot-last-balance" class="text-xs text-smoke mt-0.5"></p>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-snapshot')"
+                class="rounded-lg p-1.5 text-smoke transition-colors hover:bg-slate-100 hover:text-obsidian">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
       </div>
-      <button onclick="closeModal('modal-snapshot')" class="text-smoke hover:text-obsidian">
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
     </div>
-    <form method="post" action="{% url 'snapshot_criar' %}" class="mt-5 space-y-4">
+
+    <!-- Form -->
+    <form method="post" action="{% url 'snapshot_criar' %}" class="px-6 py-5 space-y-5">
       {% csrf_token %}
       <input type="hidden" id="snapshot-account-id" name="account" value="">
+
+      <!-- Month -->
       <div>
-        <label class="block text-xs font-semibold text-smoke">Mês de referência</label>
-        <input type="month" id="snapshot-month" name="month" required
-               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        <label class="block text-xs font-semibold text-smoke mb-1.5">Mês de referência</label>
+        <div class="relative">
+          <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+            <svg class="h-4 w-4 text-smoke" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <input type="month" id="snapshot-month" name="month" required
+                 class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm font-medium text-obsidian focus:border-solve focus:bg-white focus:outline-none focus:ring-2 focus:ring-solve/20 transition-colors">
+        </div>
       </div>
+
+      <!-- Balance — visual hero -->
       <div>
-        <label class="block text-xs font-semibold text-smoke">Saldo no fechamento (R$)</label>
-        <input type="number" name="balance" step="0.01" placeholder="0,00" required
-               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        <label class="block text-xs font-semibold text-smoke mb-1.5">Saldo no fechamento</label>
+        <div class="flex items-center gap-3 rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-solve focus-within:bg-white transition-colors">
+          <span class="text-base font-bold text-smoke/65 flex-shrink-0 select-none">R$</span>
+          <input type="number" id="snapshot-balance" name="balance" step="0.01" placeholder="0,00" required
+                 class="flex-1 min-w-0 bg-transparent text-2xl font-black text-obsidian placeholder-slate-300 focus:outline-none tabular-nums">
+        </div>
       </div>
+
+      <!-- Notes — de-emphasised -->
       <div>
-        <label class="block text-xs font-semibold text-smoke">Observação (opcional)</label>
-        <input type="text" name="notes" placeholder="Ex: rendimento, aporte…"
-               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+        <label class="block text-xs font-medium text-smoke mb-1.5">
+          Observação <span class="font-normal text-smoke">(opcional)</span>
+        </label>
+        <input type="text" name="notes" placeholder="rendimento, aporte, ajuste…"
+               class="w-full rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-sm text-obsidian placeholder-slate-300 focus:border-slate-300 focus:bg-white focus:outline-none transition-colors">
       </div>
-      <p class="text-xs text-smoke/60">Se já existe uma entrada para este mês, o valor será substituído.</p>
-      <button type="submit" class="w-full rounded-lg bg-solve py-3 text-sm font-black text-white transition-colors hover:bg-solve-dark">
-        Salvar saldo
-      </button>
+
+      <!-- Actions -->
+      <div class="flex gap-3 pt-1">
+        <button type="button" onclick="closeModal('modal-snapshot')"
+                class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-smoke transition-colors hover:bg-slate-50">
+          Cancelar
+        </button>
+        <button type="submit" id="snapshot-submit"
+                class="flex-1 rounded-xl py-2.5 text-sm font-black text-white transition-colors"
+                style="background-color: var(--snapshot-color, #00C97A)">
+          Salvar
+        </button>
+      </div>
     </form>
   </div>
 </div>
@@ -544,6 +590,35 @@ function toggleHistory(accountId) {
   chevron.style.transform = isHidden ? '' : 'rotate(180deg)';
 }
 
+(function computeSnapshotDeltas() {
+  document.querySelectorAll('[id^="history-"]').forEach(function(panel) {
+    var rows = panel.querySelectorAll('[data-balance]');
+    rows.forEach(function(row, i) {
+      if (i >= rows.length - 1) return;
+      var curr = parseFloat(row.dataset.balance);
+      var prev = parseFloat(rows[i + 1].dataset.balance);
+      var delta = curr - prev;
+      var el = row.querySelector('.snapshot-delta');
+      if (!el) return;
+
+      var abs = Math.abs(delta);
+      var sign = delta >= 0 ? '+' : '−';
+      var fmtAmt = abs >= 1000000
+        ? 'R$ ' + (abs / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'M'
+        : abs >= 1000
+          ? 'R$ ' + (abs / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'k'
+          : 'R$ ' + abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      var pctText = prev !== 0
+        ? ' · ' + (delta >= 0 ? '+' : '−') + Math.abs(delta / prev * 100).toFixed(1) + '%'
+        : '';
+
+      el.textContent = sign + fmtAmt + pctText;
+      el.classList.remove('hidden', 'text-solve', 'text-red-400');
+      el.classList.add(delta >= 0 ? 'text-solve' : 'text-red-400');
+    });
+  });
+})();
+
 function openEditConta(id, name, type, bank, color, includeInTotal, isActive) {
   const form = document.getElementById('edit-conta-form');
   form.action = `/dashboard/contas/${id}/editar/`;
@@ -557,13 +632,39 @@ function openEditConta(id, name, type, bank, color, includeInTotal, isActive) {
   openModal('modal-editar-conta');
 }
 
-function openSnapshotModal(accountId, accountName) {
+function openSnapshotModal(accountId, accountName, accountColor, latestBalance, latestMonth) {
   document.getElementById('snapshot-account-id').value = accountId;
   document.getElementById('snapshot-account-name').textContent = accountName;
+
+  // Avatar
+  const avatar = document.getElementById('snapshot-avatar');
+  avatar.textContent = accountName.charAt(0).toUpperCase();
+  avatar.style.backgroundColor = accountColor || '#00C97A';
+
+  // Header tint
+  const header = document.getElementById('snapshot-header');
+  header.style.background = (accountColor || '#00C97A') + '12';
+
+  // Submit button color
+  document.getElementById('snapshot-submit').style.backgroundColor = accountColor || '#00C97A';
+  document.documentElement.style.setProperty('--snapshot-color', accountColor || '#00C97A');
+
+  // Previous balance context
+  const lastEl = document.getElementById('snapshot-last-balance');
+  if (latestBalance !== null && latestBalance !== undefined) {
+    const fmt = parseFloat(latestBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    lastEl.textContent = `Último saldo: R$ ${fmt}${latestMonth ? ' · ' + latestMonth : ''}`;
+  } else {
+    lastEl.textContent = 'Sem saldo anterior registrado';
+  }
+
+  // Pre-fill current month and clear balance
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');
   document.getElementById('snapshot-month').value = `${y}-${m}`;
+  document.getElementById('snapshot-balance').value = '';
+
   openModal('modal-snapshot');
 }
 </script>

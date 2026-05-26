@@ -1,6 +1,13 @@
 from django.contrib import admin
+from auditlog.registry import auditlog
 
 from .models import Account, Budget, Category, Goal, Investment, RecurringTransaction, Statement, Transaction
+
+auditlog.register(Account, serialize_data=True)
+auditlog.register(Transaction, serialize_data=True)
+auditlog.register(RecurringTransaction, serialize_data=True)
+auditlog.register(Goal, serialize_data=True)
+auditlog.register(Investment, serialize_data=True)
 
 
 @admin.register(Account)

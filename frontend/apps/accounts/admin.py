@@ -1,6 +1,11 @@
 from django.contrib import admin
+from django.contrib.auth.models import User
+from auditlog.registry import auditlog
 
 from .models import UserProfile
+
+auditlog.register(User, serialize_data=True)
+auditlog.register(UserProfile, serialize_data=True)
 
 
 @admin.register(UserProfile)

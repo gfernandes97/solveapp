@@ -1,6 +1,7 @@
 import calendar
 import json
 import uuid
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
@@ -151,6 +152,49 @@ def _amount_for_month(r, mo):
     return r.monthly_amount  # fallback for unknown frequencies
 
 
+def _expand_recurring(r, cutoff: date):
+    """
+    Yields (occurrence_date, amount) for every individual occurrence of
+    RecurringTransaction r between r.start_date and min(r.end_date, cutoff).
+    Uses the same date-placement rules as _proj_date / _amount_for_month.
+    """
+    end = min(r.end_date, cutoff) if r.end_date else cutoff
+    freq = r.frequency
+
+    if freq in (RecurringTransaction.FREQ_WEEKLY, RecurringTransaction.FREQ_BIWEEKLY):
+        step = timedelta(days=7 if freq == RecurringTransaction.FREQ_WEEKLY else 14)
+        days_ahead = (r.day_of_week - r.start_date.weekday()) % 7 if r.day_of_week is not None else 0
+        occ = r.start_date + timedelta(days=days_ahead)
+        while occ <= end:
+            if occ >= r.start_date:
+                yield (occ, r.amount)
+            occ += step
+
+    elif freq == RecurringTransaction.FREQ_MONTHLY:
+        mo = r.start_date.replace(day=1)
+        while mo <= end.replace(day=1):
+            occ = _proj_date(r, mo)
+            if r.start_date <= occ <= end:
+                yield (occ, r.amount)
+            mo = _add_months(mo, 1)
+
+    else:  # quarterly / semiannual / annual
+        period = {
+            RecurringTransaction.FREQ_QUARTERLY:  3,
+            RecurringTransaction.FREQ_SEMIANNUAL: 6,
+            RecurringTransaction.FREQ_ANNUAL:     12,
+        }.get(freq, 1)
+        start_mo = r.start_date.replace(day=1)
+        mo = start_mo
+        while mo <= end.replace(day=1):
+            months_diff = (mo.year - start_mo.year) * 12 + (mo.month - start_mo.month)
+            if months_diff % period == 0:
+                occ = _proj_date(r, mo)
+                if r.start_date <= occ <= end:
+                    yield (occ, r.amount)
+            mo = _add_months(mo, 1)
+
+
 def _compute_goal_progress(goals, today):
     """
     Returns {goal_id: {executed, provisioned, executed_pct, provisioned_pct}}
@@ -233,13 +277,13 @@ def _compute_goal_progress(goals, today):
 
 def _projected_cash_balance(user, today):
     """
-    Returns the projected total cash balance at end of the current calendar month.
+    Returns the actual total cash balance as of today.
 
     Algorithm:
       1. Get the latest AccountMonthSnapshot (≤ current_month) for each included
          checking/savings/wallet account.
-      2. Project each account's balance forward month-by-month using completed
-         transactions + recurring amounts until current_month.
+      2. Project each account's balance forward month-by-month using only completed
+         transactions (no recurring estimates) until current_month.
       3. Return the sum across all accounts.
 
     Accounts with no snapshot at all contribute 0.
@@ -299,27 +343,12 @@ def _projected_cash_balance(user, today):
         delta = row["total"] or Decimal("0")
         acc_net[key] = acc_net.get(key, Decimal("0")) + (delta if row["type"] == "credit" else -delta)
 
-    rec_list = list(
-        RecurringTransaction.objects
-        .filter(
-            user=user,
-            is_active=True,
-            account__is_active=True,
-            account__include_in_total=True,
-            account__type__in=cash_types,
-        )
-    )
-
     total = Decimal("0")
     for aid, (snap_mo, snap_bal) in anchor_per_acc.items():
         bal = snap_bal
         mo = _add_months(snap_mo, 1)
         while mo <= current_mo:
             bal += acc_net.get((aid, mo), Decimal("0"))
-            for r in rec_list:
-                if r.account_id == aid:
-                    ramt = _amount_for_month(r, mo)
-                    bal += ramt if r.type == RecurringTransaction.TYPE_INCOME else -ramt
             mo = _add_months(mo, 1)
         total += bal
 
@@ -388,6 +417,31 @@ def overview(request):
         )
     ]
 
+    today_expense = Transaction.objects.filter(
+        account__user=request.user,
+        date=now.date(),
+        type=Transaction.TYPE_DEBIT,
+        is_transfer=False,
+        status=Transaction.STATUS_COMPLETED,
+    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+
+    latest_snap_subq = AccountMonthSnapshot.objects.filter(
+        account=OuterRef("pk")
+    ).order_by("-month").values("balance")[:1]
+    credit_cards = []
+    for acc in (
+        Account.objects
+        .filter(user=request.user, is_active=True, type=Account.TYPE_CREDIT, credit_limit__gt=0)
+        .annotate(latest_balance=Subquery(latest_snap_subq))
+    ):
+        bal = acc.latest_balance or Decimal("0")
+        limit = acc.credit_limit
+        pct = min(int(bal / limit * 100), 100) if limit else 0
+        acc.usage_pct = pct
+        acc.usage_amount = bal
+        acc.bar_color = "bg-red-500" if pct >= 80 else "bg-solar" if pct >= 50 else "bg-solve"
+        credit_cards.append(acc)
+
     return render(request, "dashboard/overview.html", {
         "greeting": greeting,
         "today": today,
@@ -403,6 +457,8 @@ def overview(request):
         "recent_txs": recent_txs,
         "has_accounts": accounts.exists(),
         "exp_cat_data": exp_cat_data,
+        "today_expense": today_expense,
+        "credit_cards": credit_cards,
     })
 
 
@@ -565,11 +621,19 @@ def diagnostico(request):
 
 @login_required
 def investimentos(request):
-    accounts = Account.objects.filter(user=request.user, is_active=True)
-    cash_accounts = accounts.exclude(type=Account.TYPE_INVESTMENT)
-    cash_balance = cash_accounts.filter(include_in_total=True).aggregate(
-        total=Sum("balance")
-    )["total"] or Decimal("0")
+    now = _now_br()
+
+    latest_balance_subq = AccountMonthSnapshot.objects.filter(
+        account=OuterRef("pk")
+    ).order_by("-month").values("balance")[:1]
+
+    cash_accounts = (
+        Account.objects
+        .filter(user=request.user, is_active=True)
+        .exclude(type=Account.TYPE_INVESTMENT)
+        .annotate(latest_balance=Subquery(latest_balance_subq))
+    )
+    cash_balance = _projected_cash_balance(request.user, now.date())
 
     investments = Investment.objects.filter(user=request.user).select_related("account")
     inv_by_type: dict = {}
@@ -1182,6 +1246,91 @@ def metas(request):
         g.provisioned_amount = prog.get("provisioned", Decimal("0"))
         g.executed_pct = prog.get("executed_pct", 0)
         g.provisioned_pct = prog.get("provisioned_pct", 0)
+
+    # Build per-goal drill data (transactions grouped by account)
+    all_goal_txs = (
+        Transaction.objects
+        .filter(goal__in=active_goals)
+        .select_related("account", "category", "goal")
+        .order_by("account__name", "date")
+    )
+    txs_by_goal = defaultdict(list)
+    for tx in all_goal_txs:
+        txs_by_goal[tx.goal_id].append(tx)
+
+    all_goal_rec = (
+        RecurringTransaction.objects
+        .filter(goal__in=active_goals, is_active=True)
+        .select_related("account", "category", "goal")
+        .order_by("account__name", "name")
+    )
+    rec_by_goal = defaultdict(list)
+    for r in all_goal_rec:
+        rec_by_goal[r.goal_id].append(r)
+
+    for g in active_goals:
+        # Horizon: goal deadline or 12 months ahead
+        cutoff = g.deadline if g.deadline else _add_months(today, 12)
+
+        by_acc: dict = defaultdict(lambda: {"obj": None, "rows": []})
+
+        # Regular transactions (past and future pending)
+        for tx in txs_by_goal[g.pk]:
+            by_acc[tx.account_id]["obj"] = tx.account
+            by_acc[tx.account_id]["rows"].append({
+                "date_raw": tx.date,
+                "date": tx.date.strftime("%d/%m/%Y"),
+                "desc": tx.description,
+                "amount": float(tx.amount),
+                "type": tx.type,
+                "status": Transaction.STATUS_PENDING if tx.date > today else tx.status,
+                "cat": tx.category.name if tx.category else None,
+                "recurring": False,
+                "freq": None,
+            })
+
+        # Recurring transactions — expand into individual occurrences
+        for r in rec_by_goal[g.pk]:
+            if not r.account:
+                continue
+            acc_id = r.account_id
+            by_acc[acc_id]["obj"] = r.account
+            tx_type = "credit" if r.type == RecurringTransaction.TYPE_INCOME else "debit"
+            freq_label = r.get_frequency_display()
+            for occ_date, occ_amt in _expand_recurring(r, cutoff):
+                status = Transaction.STATUS_COMPLETED if occ_date <= today else Transaction.STATUS_PENDING
+                by_acc[acc_id]["rows"].append({
+                    "date_raw": occ_date,
+                    "date": occ_date.strftime("%d/%m/%Y"),
+                    "desc": r.name,
+                    "amount": float(occ_amt),
+                    "type": tx_type,
+                    "status": status,
+                    "cat": r.category.name if r.category else None,
+                    "recurring": True,
+                    "freq": freq_label,
+                })
+
+        acc_list = []
+        for _, bucket in by_acc.items():
+            acc = bucket["obj"]
+            if acc is None:
+                continue
+            rows = sorted(bucket["rows"], key=lambda x: x["date_raw"])
+            total_credit = sum(r["amount"] for r in rows if r["type"] == "credit")
+            total_debit  = sum(r["amount"] for r in rows if r["type"] == "debit")
+            # Remove raw date before serialising (not JSON-serialisable)
+            for row in rows:
+                del row["date_raw"]
+            acc_list.append({
+                "name": acc.name,
+                "color": acc.color,
+                "total_credit": total_credit,
+                "total_debit": total_debit,
+                "txs": rows,
+            })
+        g.drill_json = json.dumps(acc_list, ensure_ascii=False)
+
     return render(request, "dashboard/metas.html", {
         "goals": goals,
         "active": active_goals,
@@ -1780,3 +1929,25 @@ def projecao(request):
 def settings(request):
     profile = getattr(request.user, "profile", None)
     return render(request, "dashboard/settings.html", {"profile": profile})
+
+
+@login_required
+@require_POST
+def settings_update(request):
+    user = request.user
+    profile = getattr(user, "profile", None)
+
+    first_name = request.POST.get("first_name", "").strip()
+    last_name = request.POST.get("last_name", "").strip()
+    phone = request.POST.get("phone", "").strip()
+
+    user.first_name = first_name
+    user.last_name = last_name
+    user.save(update_fields=["first_name", "last_name"])
+
+    if profile:
+        profile.phone = phone
+        profile.save(update_fields=["phone"])
+
+    messages.success(request, "Dados atualizados com sucesso.")
+    return redirect("settings")

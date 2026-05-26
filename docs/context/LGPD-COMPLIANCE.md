@@ -11,7 +11,9 @@
 |------|-------|----------|
 | Auditoria inicial (2026-05-21) | 30/100 | Sem política, sem direitos, sem consentimento |
 | Após sprint de implementação (2026-05-21) | 72/100 | Fundamentos legais implementados |
-| Consentimento explícito + verificação de e-mail (2026-05-22) | **79/100** | Consentimento Art. 8º conforme; email verification configurado |
+| Consentimento explícito + verificação de e-mail (2026-05-22) | 79/100 | Consentimento Art. 8º conforme; email verification configurado |
+| Correção de dados, banner de cookies, bloqueio durante exclusão (2026-05-22) | 87/100 | Todos os direitos Art. 18 com UI; cookies informados; acesso bloqueado durante grace period |
+| Log de auditoria completo — django-auditlog (2026-05-22) | **92/100** | Rastreamento de CREATE/UPDATE/DELETE em todos os modelos com dados pessoais |
 
 ---
 
@@ -66,10 +68,10 @@
 | # | Item | Base LGPD | Esforço | Notas |
 |---|------|-----------|---------|-------|
 | 4 | **Registro de Atividades de Tratamento (RAT)** — documento interno obrigatório para controladores com > 250 funcionários ou cujo tratamento apresente risco | Art. 37 | ~3h | Criar `docs/context/LGPD-RAT.md` descrevendo cada atividade: finalidade, base legal, dados, retenção, destinatários |
-| 5 | **Cron job em produção** para `purge_pending_deletions` | Art. 18, IV (eliminação) | ~1h | Configurar no Railway com `0 3 * * * python manage.py purge_pending_deletions` |
-| 6 | **Direito de correção** — UI para o usuário editar nome/e-mail | Art. 18, III | ~2h | Adicionar formulário de edição na tela de Configurações |
-| 7 | **Log de auditoria de acesso a dados** — registrar quem acessou o quê e quando (especialmente no admin Django) | Art. 6º, VII / Art. 46 | ~4h | `django-simple-history` ou log customizado; protege contra acesso indevido por funcionários |
-| 8 | **Aviso de cookies** — banner mínimo informando que apenas cookies essenciais são usados | Art. 6º, I (finalidade) / Art. 8º | ~1h | Banner simples com JS (`localStorage` para estado); não precisa de opt-out pois são cookies necessários |
+| 5 | **Cron job em produção** para `purge_pending_deletions` | Art. 18, IV (eliminação) | ~15min | ⚙️ Ver instruções abaixo — configuração no Railway Dashboard |
+| ~~6~~ | ~~Direito de correção — UI para editar nome/e-mail~~ | ~~Art. 18, III~~ | — | ✅ **Concluído** — Formulário em `/dashboard/settings/` (nome, sobrenome, telefone + link para alterar e-mail via allauth) |
+| ~~7~~ | ~~Log de auditoria de acesso a dados~~ | ~~Art. 6º, VII / Art. 46~~ | — | ✅ **Concluído** — `django-auditlog` 3.4.1; registra CREATE/UPDATE/DELETE em `User`, `UserProfile`, `Account`, `Transaction`, `RecurringTransaction`, `Goal`, `Investment`; visível no admin Django |
+| ~~8~~ | ~~Aviso de cookies~~ | ~~Art. 6º, I / Art. 8º~~ | — | ✅ **Concluído** — Banner em `base.html`, estado em `localStorage`, link para seção de cookies da política |
 
 ### Prioridade Baixa (maturidade e escala)
 
@@ -103,6 +105,38 @@ Roadmap (antes de escalar)
   ├── #10 RIPD
   └── #11 Playbook de incidentes
 ```
+
+---
+
+## Configuração do Cron no Railway (item #5)
+
+O Railway não suporta cron no `railway.toml` — cron jobs são serviços separados criados pelo dashboard.
+
+### Passo a passo
+
+1. Acesse [railway.app](https://railway.app) → abra o projeto **Solve**
+2. Clique em **"+ New"** → **"Empty Service"**
+3. Na aba **Settings** do novo serviço:
+   - **Service Name**: `purge-deletions`
+   - **Source**: mesmo repositório da aplicação principal
+   - **Root Directory**: `frontend`
+4. Na aba **Variables**, copie todas as variáveis de ambiente do serviço principal (especialmente `DATABASE_URL` e `SECRET_KEY`)
+5. Na aba **Deploy** → **"Start Command"**:
+   ```
+   python manage.py purge_pending_deletions
+   ```
+6. De volta em **Settings** → role até **"Cron Schedule"** → ative e defina:
+   ```
+   0 3 * * *
+   ```
+   _(executa todo dia às 03h00 horário UTC — 00h00 BRT)_
+
+7. Clique em **Deploy** — o Railway vai rodar o comando no horário configurado sem manter um servidor em pé.
+
+### Verificar execução
+
+- Railway → serviço `purge-deletions` → aba **Deployments** mostra cada execução com logs
+- Para testar manualmente sem deletar nada: adicione `--dry-run` ao start command temporariamente
 
 ---
 

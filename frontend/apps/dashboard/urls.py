@@ -50,4 +50,5 @@ urlpatterns = [
 
     # Configurações
     path("settings/", views.settings, name="settings"),
+    path("settings/update/", views.settings_update, name="settings_update"),
 ]

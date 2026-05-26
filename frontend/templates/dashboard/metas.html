@@ -24,8 +24,11 @@
     <!-- Metas ativas -->
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {% for g in active %}
-      <div class="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-        <div class="flex items-start justify-between gap-2">
+      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow overflow-hidden relative cursor-pointer transition-shadow hover:shadow-md"
+           onclick="openGoalDrill({{ g.pk }}, '{{ g.name|escapejs }}', '{{ g.color }}', this)"
+           data-drill="{{ g.drill_json }}">
+        <div class="absolute top-0 left-0 right-0 h-[3px] rounded-t-xl" style="background-color: {{ g.color }}"></div>
+        <div class="flex items-start justify-between gap-2" onclick="event.stopPropagation()">
           <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
                style="background-color:{{ g.color }}20">
             <svg class="h-5 w-5" style="color:{{ g.color }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,7 +65,7 @@
           <!-- Executed row -->
           <div>
             <div class="mb-1 flex items-center justify-between">
-              <span class="text-xs font-medium text-smoke/70">Executado</span>
+              <span class="text-xs font-semibold text-smoke">Realizado</span>
               <span class="text-xs font-black tabular-nums" style="color:{{ g.color }}">{{ g.executed_pct }}%</span>
             </div>
             <div class="relative h-2 w-full overflow-hidden rounded-full bg-slate-100">
@@ -76,29 +79,23 @@
           {% if g.provisioned_pct > g.executed_pct %}
           <div>
             <div class="mb-1 flex items-center justify-between">
-              <span class="text-xs font-medium text-smoke/50">Provisionado</span>
-              <span class="text-xs font-semibold tabular-nums text-smoke/60">{{ g.provisioned_pct }}%</span>
+              <span class="text-xs font-semibold text-smoke">Previsto</span>
+              <span class="text-xs font-semibold tabular-nums text-smoke">{{ g.provisioned_pct }}%</span>
             </div>
             <div class="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <div class="absolute inset-y-0 left-0 h-full rounded-full transition-all opacity-30"
+              <div class="absolute inset-y-0 left-0 h-full rounded-full transition-all opacity-60"
                    style="width:{{ g.provisioned_pct }}%;background-color:{{ g.color }}"></div>
             </div>
-            <p class="mt-0.5 text-[11px] tabular-nums text-smoke/50">R$&nbsp;{{ g.provisioned_amount|brl }}</p>
+            <p class="mt-0.5 text-xs tabular-nums text-smoke">R$&nbsp;{{ g.provisioned_amount|brl }}</p>
           </div>
           {% endif %}
 
           <!-- Target + deadline footer -->
           <div class="flex items-center justify-between border-t border-slate-100 pt-2">
-            <p class="text-xs text-smoke/60">{% if g.deadline %}Prazo: {{ g.deadline|date:"d/m/Y" }}{% else %}Sem prazo{% endif %}</p>
+            <p class="text-xs text-smoke">{% if g.deadline %}Prazo: {{ g.deadline|date:"d/m/Y" }}{% else %}Sem prazo{% endif %}</p>
             <p class="text-xs font-bold text-obsidian">Meta: R$&nbsp;{{ g.target_amount|brl }}</p>
           </div>
         </div>
-        <!-- Aporte -->
-        <button
-          onclick="openAporte({{ g.pk }}, '{{ g.name|escapejs }}')"
-          class="mt-4 w-full rounded-lg border border-slate-200 py-2 text-xs font-semibold text-obsidian transition-colors hover:bg-slate-50">
-          Registrar aporte
-        </button>
       </div>
       {% endfor %}
     </div>
@@ -131,7 +128,7 @@
     <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-smoke px-1">Concluídas</p>
     <div class="space-y-2">
       {% for g in completed %}
-      <div class="flex items-center justify-between rounded-xl border border-slate-100 bg-white px-5 py-3.5 shadow-sm">
+      <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-3.5 shadow">
         <div class="flex items-center gap-3">
           <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-solve/10">
             <svg class="h-4 w-4 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -280,7 +277,118 @@
   </div>
 </div>
 
+<!-- ─── Modal: Lançamentos da Meta ─── -->
+<div id="modal-goal-drill" class="hidden fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 py-8 overflow-y-auto"
+     onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
+    <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <div class="flex items-center gap-3">
+        <span id="drill-color-dot" class="h-3 w-3 flex-shrink-0 rounded-full"></span>
+        <h2 id="drill-goal-name" class="font-black text-obsidian"></h2>
+      </div>
+      <button onclick="document.getElementById('modal-goal-drill').classList.add('hidden')"
+              class="rounded-lg p-1 text-smoke transition-colors hover:bg-slate-100 hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="drill-content" class="space-y-4 p-6"></div>
+  </div>
+</div>
+
 <script>
+function fmtBRL(v) {
+  return v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function openGoalDrill(pk, name, color, el) {
+  document.getElementById('drill-goal-name').textContent = name;
+  const dot = document.getElementById('drill-color-dot');
+  dot.style.backgroundColor = color;
+
+  const data = JSON.parse(el.dataset.drill);
+  const content = document.getElementById('drill-content');
+
+  if (!data.length) {
+    content.innerHTML = '<p class="py-6 text-center text-sm text-smoke italic">Nenhum lançamento vinculado a esta meta.</p>';
+    document.getElementById('modal-goal-drill').classList.remove('hidden');
+    return;
+  }
+
+  content.innerHTML = data.map(acc => {
+    const rows = acc.txs.map(tx => {
+      const isRecurring = tx.recurring === true;
+      const isPending   = tx.status === 'pending';
+      const isCredit    = tx.type === 'credit';
+
+      const fixoBadge = isRecurring
+        ? `<span class="mr-1 rounded bg-signal/10 px-1 py-0.5 text-[9px] font-semibold text-signal">fixo</span>`
+        : '';
+      let statusBadge;
+      if (isPending)
+        statusBadge = fixoBadge + '<span class="rounded bg-solar/15 px-1.5 py-0.5 text-[10px] font-semibold text-solar">Previsto</span>';
+      else
+        statusBadge = fixoBadge + '<span class="rounded bg-solve/15 px-1.5 py-0.5 text-[10px] font-semibold text-solve">Realizado</span>';
+
+      const creditCell = isCredit
+        ? `<td class="px-3 py-1.5 text-right tabular-nums font-semibold text-solve">+${fmtBRL(tx.amount)}</td>`
+        : `<td class="px-3 py-1.5 text-right tabular-nums text-smoke/60">—</td>`;
+      const debitCell = !isCredit
+        ? `<td class="px-3 py-1.5 text-right tabular-nums font-semibold text-red-500">-${fmtBRL(tx.amount)}</td>`
+        : `<td class="px-3 py-1.5 text-right tabular-nums text-smoke/60">—</td>`;
+
+      const rowBg = isRecurring
+        ? (isPending ? 'bg-signal/[0.03] italic opacity-80' : 'bg-signal/[0.03]')
+        : (isPending ? 'italic opacity-75' : '');
+      return `<tr class="border-b border-slate-50 hover:bg-slate-50/60 ${rowBg}">
+        <td class="px-4 py-1.5 tabular-nums text-smoke whitespace-nowrap">${tx.date}</td>
+        <td class="max-w-[200px] truncate px-3 py-1.5 text-obsidian">${tx.desc}</td>
+        <td class="px-3 py-1.5 text-smoke whitespace-nowrap">${tx.cat || '—'}</td>
+        ${creditCell}
+        ${debitCell}
+        <td class="px-3 py-1.5 whitespace-nowrap">${statusBadge}</td>
+      </tr>`;
+    }).join('');
+
+    const totalCredit = acc.total_credit ? `<td class="px-3 py-2 text-right tabular-nums text-solve">+${fmtBRL(acc.total_credit)}</td>` : `<td class="px-3 py-2 text-right tabular-nums text-smoke/60">—</td>`;
+    const totalDebit  = acc.total_debit  ? `<td class="px-3 py-2 text-right tabular-nums text-red-500">-${fmtBRL(acc.total_debit)}</td>`  : `<td class="px-3 py-2 text-right tabular-nums text-smoke/60">—</td>`;
+
+    return `<div class="overflow-hidden rounded-xl border border-slate-200 shadow">
+      <div class="flex items-center gap-2.5 px-4 py-2.5" style="background-color:${acc.color}18; border-left:3px solid ${acc.color}">
+        <span class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full" style="background-color:${acc.color}"></span>
+        <span class="text-sm font-bold text-obsidian">${acc.name}</span>
+        <span class="ml-auto text-xs text-smoke">${acc.txs.length} lançamento${acc.txs.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-slate-100 text-smoke">
+              <th class="w-20 px-4 py-2 text-left font-medium">Data</th>
+              <th class="px-3 py-2 text-left font-medium">Descrição</th>
+              <th class="px-3 py-2 text-left font-medium">Categoria</th>
+              <th class="w-28 px-3 py-2 text-right font-medium text-solve">Entrada</th>
+              <th class="w-28 px-3 py-2 text-right font-medium text-red-500">Saída</th>
+              <th class="w-24 px-3 py-2 text-left font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr class="border-t-2 border-slate-200 bg-slate-50 text-xs font-semibold">
+              <td colspan="3" class="px-4 py-2 text-smoke">Total</td>
+              ${totalCredit}
+              ${totalDebit}
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('modal-goal-drill').classList.remove('hidden');
+}
+
 function openEditMeta(pk, name, description, target, current, deadline, color) {
   document.getElementById('form-editar-meta').action = '/dashboard/metas/' + pk + '/editar/';
   document.getElementById('edit-meta-name').value = name;

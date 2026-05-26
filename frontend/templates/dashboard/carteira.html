@@ -33,16 +33,16 @@
     <div class="pointer-events-none absolute inset-0 opacity-[0.03]"
          style="background-image:linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px);background-size:32px 32px"></div>
     <div class="relative">
-      <p class="text-sm font-medium text-white/50">Patrimônio total</p>
-      <p class="mt-2 font-black tracking-tight leading-none"><span class="text-2xl font-medium text-white/40">R$&nbsp;</span><span class="text-5xl text-white">{{ patrimonio|brl }}</span></p>
+      <p class="text-sm font-medium text-white/65">Patrimônio total</p>
+      <p class="mt-2 font-black tracking-tight leading-none"><span class="text-2xl font-medium text-white/60">R$&nbsp;</span><span class="text-5xl text-white">{{ patrimonio|brl }}</span></p>
     </div>
     <div class="relative mt-6 flex flex-wrap gap-8 border-t border-white/10 pt-5">
       <div>
-        <p class="text-xs text-white/40">Caixa</p>
+        <p class="text-xs text-white/60">Caixa</p>
         <p class="mt-0.5 text-xl font-bold text-white">R$&nbsp;{{ cash_balance|brl }}</p>
       </div>
       <div>
-        <p class="text-xs text-white/40">Investimentos</p>
+        <p class="text-xs text-white/60">Investimentos</p>
         <p class="mt-0.5 text-xl font-bold text-white">R$&nbsp;{{ inv_total|brl }}</p>
       </div>
     </div>
@@ -52,7 +52,7 @@
   <div class="grid gap-6 lg:grid-cols-2">
 
     <!-- Caixa (contas bancárias) -->
-    <div class="rounded-xl border border-slate-100 bg-white shadow-sm">
+    <div class="rounded-xl border border-slate-200 bg-white shadow">
       <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h3 class="font-semibold text-obsidian">Caixa</h3>
         <a href="{% url 'contas' %}" class="text-xs font-medium text-solve hover:text-solve-dark transition-colors">Gerenciar</a>
@@ -96,7 +96,7 @@
     </div>
 
     <!-- Investimentos por classe -->
-    <div class="rounded-xl border border-slate-100 bg-white shadow-sm">
+    <div class="rounded-xl border border-slate-200 bg-white shadow">
       <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h3 class="font-semibold text-obsidian">Investimentos</h3>
         <span class="text-xs text-smoke">por classe de ativo</span>
@@ -135,7 +135,7 @@
 
   <!-- Lista detalhada de investimentos -->
   {% if investments %}
-  <div class="rounded-xl border border-slate-100 bg-white shadow-sm">
+  <div class="rounded-xl border border-slate-200 bg-white shadow">
     <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
       <h3 class="font-semibold text-obsidian">Ativos</h3>
       <button onclick="document.getElementById('modal-novo-investimento').classList.remove('hidden')"
@@ -195,7 +195,7 @@
   {% endif %}
 
   <!-- Metas -->
-  <div class="rounded-xl border border-slate-100 bg-white shadow-sm">
+  <div class="rounded-xl border border-slate-200 bg-white shadow">
     <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
       <h3 class="font-semibold text-obsidian">Metas ativas</h3>
       <a href="{% url 'metas' %}" class="text-xs font-medium text-solve hover:text-solve-dark transition-colors">Ver todas</a>
