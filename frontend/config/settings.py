@@ -75,6 +75,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.dashboard.context_processors.achievement_toasts",
             ],
             "builtins": [
                 "apps.dashboard.templatetags.finance_tags",

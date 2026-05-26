@@ -2,6 +2,10 @@
 {% block title %}Diagnóstico{% endblock %}
 {% block header_title %}Diagnóstico{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="space-y-5">
 
@@ -31,6 +35,30 @@
       Análise financeira
     </span>
   </div>
+
+  {% if not has_data %}
+  <!-- Gap 4: no transactions for this month -->
+  <div class="rounded-xl border border-slate-200 bg-white p-10 text-center">
+    <div class="flex flex-col items-center gap-4">
+      <div class="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+        <svg class="h-7 w-7 text-smoke" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="text-base font-bold text-obsidian">Nenhum lançamento em {{ diag_month_name }} {{ diag_year }}</p>
+        <p class="mt-1 max-w-sm text-sm text-smoke">Registre receitas e despesas neste mês para ver o diagnóstico completo do seu fluxo financeiro.</p>
+      </div>
+      <a href="{% url 'lancamentos' %}?ano={{ year }}&mes={{ month }}"
+         class="inline-flex items-center gap-2 rounded-lg bg-signal px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-signal/90">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Adicionar lançamentos
+      </a>
+    </div>
+  </div>
+  {% else %}
 
   <!-- KPI row -->
   <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -162,75 +190,77 @@
     </div>
   </div>
 
-  <!-- Gastos + Receitas por categoria -->
+  <!-- Receitas + Gastos por categoria -->
   <div class="grid gap-5 lg:grid-cols-2">
 
+    <!-- Receitas por Categoria -->
     <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
-      <div class="flex items-center justify-between">
-        <h3 class="font-semibold text-obsidian">Gastos por Categoria</h3>
-        <span class="text-xs text-smoke">R$&nbsp;{{ expense|brl }}</span>
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h3 class="font-semibold text-obsidian">Receitas por Categoria</h3>
+          <p class="text-xs text-smoke">Variáveis + fixos</p>
+        </div>
+        <span class="text-xs font-semibold text-solve">R$&nbsp;{{ income|brl }}</span>
       </div>
-      {% if exp_cat_data %}
-        <ul class="mt-4 space-y-3">
-          {% for cat in exp_cat_data %}
-          <li>
-            <div class="mb-1 flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <span class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full"
-                      style="background-color:{{ cat.color }}20; color:{{ cat.color }}">
-                  {% category_icon cat.icon "h-3.5 w-3.5" %}
-                </span>
-                <span class="text-sm font-medium text-obsidian">{{ cat.name }}</span>
-              </div>
-              <div class="flex items-center gap-2 text-xs">
-                <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
-                <span class="text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
-              </div>
+      {% if all_inc_cat_data %}
+        <div class="flex justify-center">
+          <div class="relative h-48 w-48">
+            <canvas id="chart-inc-cat"></canvas>
+          </div>
+        </div>
+        <ul id="legend-inc-cat" class="mt-5 space-y-2.5">
+          {% for cat in all_inc_cat_data %}
+          <li class="flex items-center justify-between" data-idx="{{ forloop.counter0 }}">
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="inc-dot h-2.5 w-2.5 flex-shrink-0 rounded-full"></span>
+              <span class="truncate text-sm text-obsidian">{{ cat.name }}</span>
             </div>
-            <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <div class="h-full rounded-full transition-all" style="width:{{ cat.pct }}%; background-color:{{ cat.color }}"></div>
+            <div class="ml-3 flex flex-shrink-0 items-center gap-3 text-xs">
+              <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
+              <span class="tabular-nums text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
             </div>
           </li>
           {% endfor %}
         </ul>
       {% else %}
-        <div class="mt-5 flex flex-col items-center gap-2 py-6 text-center">
-          <p class="text-sm text-smoke">Nenhum gasto com categoria este mês</p>
+        <div class="flex flex-col items-center gap-2 py-8 text-center">
+          <p class="text-sm text-smoke">Nenhum lançamento com categoria</p>
         </div>
       {% endif %}
     </div>
 
+    <!-- Gastos por Categoria -->
     <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
-      <div class="flex items-center justify-between">
-        <h3 class="font-semibold text-obsidian">Receitas por Categoria</h3>
-        <span class="text-xs text-smoke">R$&nbsp;{{ income|brl }}</span>
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h3 class="font-semibold text-obsidian">Gastos por Categoria</h3>
+          <p class="text-xs text-smoke">Variáveis + fixos</p>
+        </div>
+        <span class="text-xs font-semibold text-red-500">R$&nbsp;{{ expense|brl }}</span>
       </div>
-      {% if inc_cat_data %}
-        <ul class="mt-4 space-y-3">
-          {% for cat in inc_cat_data %}
-          <li>
-            <div class="mb-1 flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <span class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full"
-                      style="background-color:{{ cat.color }}20; color:{{ cat.color }}">
-                  {% category_icon cat.icon "h-3.5 w-3.5" %}
-                </span>
-                <span class="text-sm font-medium text-obsidian">{{ cat.name }}</span>
-              </div>
-              <div class="flex items-center gap-2 text-xs">
-                <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
-                <span class="text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
-              </div>
+      {% if all_exp_cat_data %}
+        <div class="flex justify-center">
+          <div class="relative h-48 w-48">
+            <canvas id="chart-exp-cat"></canvas>
+          </div>
+        </div>
+        <ul id="legend-exp-cat" class="mt-5 space-y-2.5">
+          {% for cat in all_exp_cat_data %}
+          <li class="flex items-center justify-between" data-idx="{{ forloop.counter0 }}">
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="exp-dot h-2.5 w-2.5 flex-shrink-0 rounded-full"></span>
+              <span class="truncate text-sm text-obsidian">{{ cat.name }}</span>
             </div>
-            <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <div class="h-full rounded-full transition-all" style="width:{{ cat.pct }}%; background-color:{{ cat.color }}"></div>
+            <div class="ml-3 flex flex-shrink-0 items-center gap-3 text-xs">
+              <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
+              <span class="tabular-nums text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
             </div>
           </li>
           {% endfor %}
         </ul>
       {% else %}
-        <div class="mt-5 flex flex-col items-center gap-2 py-6 text-center">
-          <p class="text-sm text-smoke">Nenhuma receita com categoria este mês</p>
+        <div class="flex flex-col items-center gap-2 py-8 text-center">
+          <p class="text-sm text-smoke">Nenhum lançamento com categoria</p>
         </div>
       {% endif %}
     </div>
@@ -401,5 +431,84 @@
     </div>
   </div>
 
+  {% endif %}{# has_data #}
+
 </div>
+
+{% if has_data %}
+<script>
+(function () {
+  const fmtBRL = v => 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+  // Receitas: verde-marca → azul → âmbar → tonalidades derivadas
+  const INC_PALETTE = [
+    '#00C97A', '#2563EB', '#F59E0B', '#33D48E',
+    '#1D4ED8', '#D97706', '#00A862', '#0EA5E9',
+    '#A78BFA', '#38BDF8',
+  ];
+
+  // Gastos: paleta quente-vibrante, distinta das receitas, coesa com a marca
+  const EXP_PALETTE = [
+    '#F97316', '#8B5CF6', '#EC4899', '#F59E0B',
+    '#06B6D4', '#6366F1', '#EF4444', '#14B8A6',
+    '#A855F7', '#2563EB',
+  ];
+
+  function makeDoughnut(canvasId, labels, amounts, palette) {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    const colors = amounts.map((_, i) => palette[i % palette.length]);
+    new Chart(el, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: amounts,
+          backgroundColor: colors,
+          borderColor: '#fff',
+          borderWidth: 2,
+          hoverOffset: 6,
+        }]
+      },
+      options: {
+        cutout: '62%',
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ' ' + ctx.label + ': ' + fmtBRL(ctx.raw),
+            },
+            backgroundColor: '#0F172A',
+            titleColor: '#fff',
+            bodyColor: '#CBD5E1',
+            padding: 10,
+            cornerRadius: 8,
+          },
+        },
+      },
+    });
+  }
+
+  {% if all_inc_cat_data %}
+  makeDoughnut(
+    'chart-inc-cat',
+    [{% for c in all_inc_cat_data %}"{{ c.name|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+    [{% for c in all_inc_cat_data %}{{ c.amount }}{% if not forloop.last %},{% endif %}{% endfor %}],
+    INC_PALETTE
+  );
+  {% endif %}
+
+  {% if all_exp_cat_data %}
+  makeDoughnut(
+    'chart-exp-cat',
+    [{% for c in all_exp_cat_data %}"{{ c.name|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+    [{% for c in all_exp_cat_data %}{{ c.amount }}{% if not forloop.last %},{% endif %}{% endfor %}],
+    EXP_PALETTE
+  );
+  {% endif %}
+})();
+</script>
+{% endif %}
 {% endblock %}

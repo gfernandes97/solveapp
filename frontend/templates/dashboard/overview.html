@@ -11,7 +11,14 @@
       <h1 class="text-2xl font-black tracking-tight text-obsidian">
         {{ greeting }}, {{ first_name }}.
       </h1>
-      <p class="mt-0.5 text-sm text-smoke">{{ today }}</p>
+      <div class="mt-1 flex items-center gap-3">
+        <p class="text-sm text-smoke">{{ today }}</p>
+        {% if streak > 0 %}
+        <span class="inline-flex items-center gap-1 rounded-full bg-solar/10 px-2.5 py-0.5 text-xs font-semibold text-solar">
+          🔥 {{ streak }} {% if streak == 1 %}mês ativo{% else %}meses consecutivos{% endif %}
+        </span>
+        {% endif %}
+      </div>
     </div>
     <a href="{% url 'lancamentos' %}"
        class="inline-flex items-center gap-2 self-start rounded-lg bg-solve px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-solve-dark sm:self-auto">
@@ -50,6 +57,27 @@
     </div>
   </div>
   </a>
+
+  {% if no_snapshots %}
+  <!-- Gap 1: accounts exist but no snapshot yet -->
+  <div class="flex items-start gap-4 rounded-xl border border-solar/30 bg-solar/5 p-4">
+    <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-solar/15">
+      <svg class="h-5 w-5 text-solar" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+    </div>
+    <div>
+      <p class="font-semibold text-obsidian">Registre o saldo das suas contas</p>
+      <p class="mt-0.5 text-sm text-smoke">Para que a projeção e o diagnóstico funcionem corretamente, informe o saldo atual de cada custódia.</p>
+      <a href="{% url 'contas' %}" class="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-solar transition-opacity hover:opacity-75">
+        Registrar saldo agora
+        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- KPI cards -->
   <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -106,6 +134,49 @@
       <p class="mt-1 text-xs text-smoke">Hoje</p>
     </a>
 
+  </div>
+
+  <!-- Health Score -->
+  <div class="rounded-xl border border-slate-200 bg-white p-6 shadow" x-data="{open:false}">
+    <div class="flex items-start justify-between gap-4">
+      <!-- Ring + score -->
+      <div class="flex items-center gap-5">
+        <div class="relative h-24 w-24 flex-shrink-0">
+          <svg class="h-24 w-24 -rotate-90" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#F1F5F9" stroke-width="10"/>
+            <circle cx="50" cy="50" r="38" fill="none" stroke="{{ health_score.ring_color }}" stroke-width="10"
+                    stroke-dasharray="238.76" stroke-dashoffset="{{ health_score.ring_offset }}"
+                    stroke-linecap="round" style="transition:stroke-dashoffset .6s ease"/>
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span class="text-2xl font-black leading-none text-obsidian">{{ health_score.score }}</span>
+            <span class="text-[10px] font-bold" style="color:{{ health_score.color }}">{{ health_score.label }}</span>
+          </div>
+        </div>
+        <div>
+          <h3 class="font-semibold text-obsidian">Score Financeiro</h3>
+          <p class="mt-0.5 text-xs text-smoke">Composição da saúde das suas finanças</p>
+          <button @click="open=!open" class="mt-2 text-xs font-semibold text-solve transition-opacity hover:opacity-75" x-text="open ? 'Ocultar detalhes' : 'Ver detalhes'"></button>
+        </div>
+      </div>
+      <!-- Earned badges summary -->
+      <div class="hidden sm:flex flex-col items-end gap-1 text-right flex-shrink-0">
+        <p class="text-2xl font-black text-obsidian">{{ earned_count }}<span class="text-sm font-medium text-smoke">/{{ total_achievements }}</span></p>
+        <p class="text-xs text-smoke">conquistas</p>
+      </div>
+    </div>
+    <!-- Breakdown (expandable) -->
+    <div x-show="open" x-transition class="mt-5 space-y-2.5 border-t border-slate-100 pt-4">
+      {% for item in health_score.breakdown %}
+      <div class="flex items-center gap-3">
+        <span class="w-32 flex-shrink-0 text-xs text-smoke">{{ item.name }}</span>
+        <div class="flex-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <div class="h-full rounded-full" style="width:{% widthratio item.pts item.max 100 %}%; background-color:{{ health_score.ring_color }}"></div>
+        </div>
+        <span class="w-12 flex-shrink-0 text-right text-xs font-semibold text-obsidian">{{ item.pts }}/{{ item.max }}</span>
+      </div>
+      {% endfor %}
+    </div>
   </div>
 
   {% if credit_cards %}
@@ -273,6 +344,25 @@
       {% endfor %}
     </div>
   </div>
+  {% elif can_use_goals and goals_count == 0 %}
+  <!-- Gap 3: Pro user with access to goals but none created yet -->
+  <div class="flex items-start gap-4 rounded-xl border border-signal/20 bg-signal/5 p-5">
+    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-signal/15">
+      <svg class="h-5 w-5 text-signal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+    </div>
+    <div class="flex-1">
+      <p class="font-semibold text-obsidian">Defina sua primeira meta financeira</p>
+      <p class="mt-0.5 text-sm text-smoke">Você tem acesso ao módulo de Metas. Configure um objetivo agora e o Solve começa a projetar seu progresso automaticamente.</p>
+      <a href="{% url 'metas' %}" class="mt-3 inline-flex items-center gap-2 rounded-lg bg-signal px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-signal/90">
+        Criar primeira meta
+        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+  </div>
   {% endif %}
 
   {% if not has_accounts %}
@@ -285,7 +375,7 @@
         </svg>
       </div>
       <div>
-        <p class="font-bold text-obsidian">Configure sua conta em 3 passos</p>
+        <p class="font-bold text-obsidian">Configure sua conta em 4 passos</p>
         <p class="text-xs text-smoke">Leva menos de 5 minutos para começar</p>
       </div>
     </div>
@@ -321,6 +411,15 @@
           </div>
         </div>
       </li>
+      <li>
+        <div class="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 opacity-50">
+          <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-sm font-black text-violet-500">4</div>
+          <div>
+            <p class="text-sm font-medium text-obsidian">Configure seus gastos fixos</p>
+            <p class="text-xs text-smoke">Salário, aluguel, assinaturas e recorrências</p>
+          </div>
+        </div>
+      </li>
     </ol>
   </div>
   {% elif not recent_txs %}
@@ -352,6 +451,40 @@
     </div>
   </div>
   {% endif %}
+
+
+  <!-- Achievements -->
+  <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
+    <div class="mb-5 flex items-center justify-between">
+      <div>
+        <h3 class="font-semibold text-obsidian">Conquistas</h3>
+        <p class="mt-0.5 text-xs text-smoke">{{ earned_count }} de {{ total_achievements }} desbloqueadas</p>
+      </div>
+      {% if earned_count == total_achievements %}
+      <span class="rounded-full bg-solve/10 px-3 py-1 text-xs font-bold text-solve">Completo 🎉</span>
+      {% endif %}
+    </div>
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {% for a in achievements_list %}
+      <div class="relative flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all
+                  {% if a.earned %}border-slate-200 bg-white shadow-sm{% else %}border-dashed border-slate-200 bg-slate-50 opacity-50{% endif %}">
+        <span class="text-2xl leading-none">{{ a.icon }}</span>
+        <div>
+          <p class="text-xs font-semibold {% if a.earned %}text-obsidian{% else %}text-smoke{% endif %}">{{ a.name }}</p>
+          <p class="mt-0.5 text-[10px] text-smoke leading-tight">{{ a.description }}</p>
+        </div>
+        <span class="mt-auto text-[10px] font-bold {% if a.earned %}text-solve{% else %}text-slate-400{% endif %}">+{{ a.points }}pts</span>
+        {% if a.earned %}
+        <div class="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-solve flex items-center justify-center">
+          <svg class="h-2.5 w-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
 
 </div>
 {% endblock %}

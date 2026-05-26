@@ -25,6 +25,7 @@ from apps.finances.models import (
     Transaction,
 )
 from apps.dashboard.templatetags.finance_tags import AVAILABLE_ICONS
+from apps.dashboard import achievements as ach
 
 _MONTHS = [
     "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -442,6 +443,29 @@ def overview(request):
         acc.bar_color = "bg-red-500" if pct >= 80 else "bg-solar" if pct >= 50 else "bg-solve"
         credit_cards.append(acc)
 
+    has_accounts = accounts.exists()
+    no_snapshots = (
+        has_accounts and
+        not AccountMonthSnapshot.objects.filter(account__user=request.user).exists()
+    )
+    try:
+        can_use_goals = request.user.subscription.can_use_goals
+    except AttributeError:
+        can_use_goals = False
+
+    # ── Gamification ─────────────────────────────────────────────────────────
+    ach.check_achievements(request.user, request)
+    health_score = ach.compute_health_score(request.user)
+    streak = ach.compute_streak(request.user)
+    from apps.finances.models import UserAchievement
+    earned_slugs = set(
+        UserAchievement.objects.filter(user=request.user).values_list("slug", flat=True)
+    )
+    achievements_list = [
+        {**data, "slug": slug, "earned": slug in earned_slugs}
+        for slug, data in ach.ACHIEVEMENTS.items()
+    ]
+
     return render(request, "dashboard/overview.html", {
         "greeting": greeting,
         "today": today,
@@ -455,10 +479,17 @@ def overview(request):
         "goals": goals_list,
         "goals_count": goals_qs.count(),
         "recent_txs": recent_txs,
-        "has_accounts": accounts.exists(),
+        "has_accounts": has_accounts,
+        "no_snapshots": no_snapshots,
+        "can_use_goals": can_use_goals,
         "exp_cat_data": exp_cat_data,
         "today_expense": today_expense,
         "credit_cards": credit_cards,
+        "health_score": health_score,
+        "streak": streak,
+        "achievements_list": achievements_list,
+        "earned_count": len(earned_slugs),
+        "total_achievements": len(ach.ACHIEVEMENTS),
     })
 
 
@@ -480,10 +511,7 @@ def diagnostico(request):
     month_start = date(year, month, 1)
     next_month_start = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
 
-    accounts = Account.objects.filter(user=request.user, is_active=True, include_in_total=True)
-    cash_balance = accounts.exclude(type=Account.TYPE_INVESTMENT).aggregate(
-        total=Sum("balance")
-    )["total"] or Decimal("0")
+    cash_balance = _projected_cash_balance(request.user, now.date())
     investments = Investment.objects.filter(user=request.user)
     inv_value = Decimal(str(sum(i.current_value for i in investments)))
     patrimonio = cash_balance + inv_value
@@ -494,29 +522,40 @@ def diagnostico(request):
         date__month=month,
         status=Transaction.STATUS_COMPLETED,
     )
-    income = month_txs.filter(type=Transaction.TYPE_CREDIT).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    expense = month_txs.filter(type=Transaction.TYPE_DEBIT).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+
+    # Fixos (RecurringTransaction) computed first — they drive the grand totals
+    fixos_qs = RecurringTransaction.objects.filter(
+        user=request.user,
+        is_active=True,
+        start_date__lt=next_month_start,
+    ).filter(Q(end_date__isnull=True) | Q(end_date__gte=month_start))
+    fixos_exp_list = list(fixos_qs.filter(type=RecurringTransaction.TYPE_EXPENSE).select_related("category"))
+    fixos_inc_list = list(fixos_qs.filter(type=RecurringTransaction.TYPE_INCOME).select_related("category"))
+    fixos_exp_total = sum(_amount_for_month(r, month_start) for r in fixos_exp_list)
+    fixos_inc_total = sum(_amount_for_month(r, month_start) for r in fixos_inc_list)
+
+    # Variable amounts from one-off transactions only
+    var_inc_amt = month_txs.filter(type=Transaction.TYPE_CREDIT, is_transfer=False).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    var_exp_amt = month_txs.filter(type=Transaction.TYPE_DEBIT, is_transfer=False).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+
+    # Grand totals = variable + fixed
+    fixed_inc_amt = fixos_inc_total
+    fixed_exp_amt = fixos_exp_total
+    income  = var_inc_amt + fixos_inc_total
+    expense = var_exp_amt + fixos_exp_total
     month_balance = income - expense
 
-    fixed_inc_amt = month_txs.filter(
-        type=Transaction.TYPE_CREDIT, is_recurring=True
-    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    var_inc_amt = income - fixed_inc_amt
-    fixed_exp_amt = month_txs.filter(
-        type=Transaction.TYPE_DEBIT, is_recurring=True
-    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    var_exp_amt = expense - fixed_exp_amt
-
+    # Category breakdown — actual transactions only; pct relative to variable totals
     exp_cat_data = [
         {
             "name": r["category__name"] or "Sem categoria",
             "icon": r["category__icon"] or "more-horizontal",
             "color": r["category__color"] or "#64748B",
             "amount": r["total"],
-            "pct": min(int(r["total"] / expense * 100), 100) if expense else 0,
+            "pct": min(int(r["total"] / var_exp_amt * 100), 100) if var_exp_amt else 0,
         }
         for r in (
-            month_txs.filter(type=Transaction.TYPE_DEBIT)
+            month_txs.filter(type=Transaction.TYPE_DEBIT, is_transfer=False)
             .values("category__name", "category__icon", "category__color")
             .annotate(total=Sum("amount"))
             .order_by("-total")
@@ -528,25 +567,43 @@ def diagnostico(request):
             "icon": r["category__icon"] or "more-horizontal",
             "color": r["category__color"] or "#64748B",
             "amount": r["total"],
-            "pct": min(int(r["total"] / income * 100), 100) if income else 0,
+            "pct": min(int(r["total"] / var_inc_amt * 100), 100) if var_inc_amt else 0,
         }
         for r in (
-            month_txs.filter(type=Transaction.TYPE_CREDIT)
+            month_txs.filter(type=Transaction.TYPE_CREDIT, is_transfer=False)
             .values("category__name", "category__icon", "category__color")
             .annotate(total=Sum("amount"))
             .order_by("-total")
         )
     ]
 
-    fixos_qs = RecurringTransaction.objects.filter(
-        user=request.user,
-        is_active=True,
-        start_date__lt=next_month_start,
-    ).filter(Q(end_date__isnull=True) | Q(end_date__gte=month_start))
-    fixos_exp_list = list(fixos_qs.filter(type=RecurringTransaction.TYPE_EXPENSE).select_related("category"))
-    fixos_inc_list = list(fixos_qs.filter(type=RecurringTransaction.TYPE_INCOME).select_related("category"))
-    fixos_exp_total = sum(r.monthly_amount for r in fixos_exp_list)
-    fixos_inc_total = sum(r.monthly_amount for r in fixos_inc_list)
+    # Merged category data (variable + fixed) for pie charts
+    def _merge_cat(base_data, fixos_list, total):
+        merged = {}
+        for cat in base_data:
+            key = cat["name"]
+            merged[key] = dict(cat)
+        for r in fixos_list:
+            amt = _amount_for_month(r, month_start)
+            if not amt:
+                continue
+            cat_name = r.category.name if r.category else "Sem categoria"
+            if cat_name in merged:
+                merged[cat_name]["amount"] += amt
+            else:
+                merged[cat_name] = {
+                    "name": cat_name,
+                    "icon": r.category.icon if r.category else "more-horizontal",
+                    "color": r.category.color if r.category else "#64748B",
+                    "amount": amt,
+                }
+        result = sorted(merged.values(), key=lambda x: -x["amount"])
+        for cat in result:
+            cat["pct"] = min(int(cat["amount"] / total * 100), 100) if total else 0
+        return result
+
+    all_exp_cat_data = _merge_cat(exp_cat_data, fixos_exp_list, expense)
+    all_inc_cat_data = _merge_cat(inc_cat_data, fixos_inc_list, income)
 
     savings_rate = max(0, int((income - expense) / income * 100)) if income else 0
     commitment_rate = min(100, int(fixos_exp_total / income * 100)) if income else 0
@@ -582,8 +639,11 @@ def diagnostico(request):
     else:
         next_month, next_year = month + 1, year
 
+    has_data = income > 0 or expense > 0
+
     return render(request, "dashboard/diagnostico.html", {
         "diag_month_name": _MONTHS[month - 1].capitalize(),
+        "has_data": has_data,
         "diag_year": year,
         "month": month,
         "year": year,
@@ -600,6 +660,8 @@ def diagnostico(request):
         "var_exp_amt": var_exp_amt,
         "exp_cat_data": exp_cat_data,
         "inc_cat_data": inc_cat_data,
+        "all_exp_cat_data": all_exp_cat_data,
+        "all_inc_cat_data": all_inc_cat_data,
         "fixos_exp_list": fixos_exp_list,
         "fixos_inc_list": fixos_inc_list,
         "fixos_exp_total": fixos_exp_total,
@@ -702,6 +764,7 @@ def lancamentos(request):
                     status=Transaction.STATUS_COMPLETED,
                     is_recurring=is_recurring,
                 )
+                ach.award(request.user, "first_transaction", request)
                 if tx_type == Transaction.TYPE_CREDIT:
                     acc.balance += amount
                 else:
@@ -982,6 +1045,7 @@ def fixo_criar(request):
             day_of_month=day_of_month,
             notes=notes,
         )
+        ach.award(request.user, "fixos_configured", request)
     return redirect("/dashboard/lancamentos/?tab=fixos")
 
 
@@ -1088,6 +1152,7 @@ def contas(request):
                 closing_day=_iv(request.POST.get("closing_day")),
                 due_day=_iv(request.POST.get("due_day")),
             )
+            ach.award(request.user, "first_account", request)
         return redirect("contas")
 
     latest_balance_subq = AccountMonthSnapshot.objects.filter(
@@ -1159,6 +1224,7 @@ def snapshot_criar(request):
                 month=mo,
                 defaults={"balance": balance, "notes": notes},
             )
+            ach.award(request.user, "first_snapshot", request)
         except (Account.DoesNotExist, ValueError):
             pass
     return redirect("contas")
@@ -1220,6 +1286,7 @@ def metas(request):
                     g.is_completed = True
                     from datetime import datetime as _dt_cls
                     g.completed_at = _dt_cls.now(ZoneInfo("America/Sao_Paulo"))
+                    ach.award(request.user, "goal_completed", request)
                 g.save()
             return redirect("metas")
 
@@ -1234,6 +1301,7 @@ def metas(request):
                 deadline=_dt(request.POST.get("deadline")),
                 color=request.POST.get("color", "#00C97A"),
             )
+            ach.award(request.user, "first_goal", request)
         return redirect("metas")
 
     today = _now_br().date()
@@ -1352,6 +1420,7 @@ def meta_editar(request, pk):
         g.color = request.POST.get("color", g.color)
         if g.current_amount >= g.target_amount and not g.is_completed:
             g.is_completed = True
+            ach.award(request.user, "goal_completed", request)
         g.save()
     return redirect("metas")
 
@@ -1397,6 +1466,7 @@ def investimento_criar(request):
             current_price=current_price,
             purchase_date=purchase_date,
         )
+        ach.award(request.user, "first_investment", request)
     return redirect("investimentos")
 
 

@@ -354,3 +354,18 @@ class Investment(models.Model):
     @property
     def profit_loss(self):
         return self.current_value - self.total_invested
+
+
+class UserAchievement(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="achievements")
+    slug = models.CharField(max_length=50)
+    unlocked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("user", "slug")]
+        ordering = ["unlocked_at"]
+        verbose_name = "Achievement"
+        verbose_name_plural = "Achievements"
+
+    def __str__(self):
+        return f"{self.user.email} — {self.slug}"
