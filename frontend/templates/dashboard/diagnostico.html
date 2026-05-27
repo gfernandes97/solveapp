@@ -491,6 +491,13 @@
     });
   }
 
+  function applyLegendColors(listId, dotClass, palette) {
+    document.querySelectorAll('#' + listId + ' [data-idx] .' + dotClass).forEach(el => {
+      const idx = parseInt(el.closest('[data-idx]').dataset.idx, 10);
+      el.style.backgroundColor = palette[idx % palette.length];
+    });
+  }
+
   {% if all_inc_cat_data %}
   makeDoughnut(
     'chart-inc-cat',
@@ -498,6 +505,7 @@
     [{% for c in all_inc_cat_data %}{{ c.amount }}{% if not forloop.last %},{% endif %}{% endfor %}],
     INC_PALETTE
   );
+  applyLegendColors('legend-inc-cat', 'inc-dot', INC_PALETTE);
   {% endif %}
 
   {% if all_exp_cat_data %}
@@ -507,6 +515,7 @@
     [{% for c in all_exp_cat_data %}{{ c.amount }}{% if not forloop.last %},{% endif %}{% endfor %}],
     EXP_PALETTE
   );
+  applyLegendColors('legend-exp-cat', 'exp-dot', EXP_PALETTE);
   {% endif %}
 })();
 </script>
