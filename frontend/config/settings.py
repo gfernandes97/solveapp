@@ -30,8 +30,6 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
-    # audit log (LGPD Art. 46)
-    "auditlog",
     # local
     "apps.core",
     "apps.accounts",
@@ -51,7 +49,6 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
-    "auditlog.middleware.AuditlogMiddleware",
     "apps.accounts.middleware.SubscriptionCheckMiddleware",
 ]
 
