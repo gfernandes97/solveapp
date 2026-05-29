@@ -68,20 +68,20 @@
             R$&nbsp;{{ acc.latest_balance|brl }}
           </p>
           {% if acc.latest_month %}
-          <p class="mt-0.5 text-xs font-medium text-smoke">Saldo de {{ acc.latest_month|date:"M/Y" }}</p>
+          <p class="mt-0.5 text-xs font-medium text-smoke">Saldo patrimonial · {{ acc.latest_month|date:"M/Y" }}</p>
           {% endif %}
           {% else %}
           <p class="text-sm font-semibold text-smoke italic">Sem saldo registrado</p>
-          <p class="mt-0.5 text-xs text-smoke">Registre o saldo do mês atual para começar</p>
+          <p class="mt-0.5 text-xs text-smoke">Registre o saldo patrimonial desta conta para começar</p>
           {% endif %}
         </div>
       </div>
       <!-- Card footer: register + history -->
       <div class="flex items-center justify-between border-t border-slate-100 px-3 py-2 bg-slate-50/50">
         <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}', '{{ acc.color }}', {% if acc.latest_balance is not None %}'{{ acc.latest_balance }}'{% else %}null{% endif %}, {% if acc.latest_month %}'{{ acc.latest_month|date:"M/Y" }}'{% else %}null{% endif %})"
-                class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-solve transition-colors hover:bg-solve/10" title="Registrar saldo do mês">
+                class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-solve transition-colors hover:bg-solve/10" title="Registrar saldo patrimonial da conta no mês">
           <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          Registrar saldo
+          Atualizar patrimônio
         </button>
         <button onclick="toggleHistory({{ acc.id }})"
                 class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-smoke transition-colors hover:bg-slate-100 hover:text-obsidian">
@@ -406,7 +406,7 @@
         <div class="flex items-center gap-2">
           <input type="checkbox" name="include_in_total" id="nc-include" checked
                  class="rounded border-slate-300 text-solve focus:ring-solve">
-          <label for="nc-include" class="text-sm text-smoke">Incluir no saldo total</label>
+          <label for="nc-include" class="text-sm text-smoke">Incluir no saldo patrimonial</label>
         </div>
         <div>
           <label class="text-xs font-semibold text-smoke">Cor</label>
@@ -496,7 +496,7 @@
   </div>
 </div>
 
-<!-- ─── Modal: Registrar Saldo do Mês ─── -->
+<!-- ─── Modal: Registrar Saldo Total da Conta ─── -->
 <div id="modal-snapshot" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
   <div class="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden">
 
@@ -542,12 +542,13 @@
 
       <!-- Balance — visual hero -->
       <div>
-        <label class="block text-xs font-semibold text-smoke mb-1.5">Saldo no fechamento</label>
+        <label class="block text-xs font-semibold text-smoke mb-1.5">Saldo patrimonial da conta</label>
         <div class="flex items-center gap-3 rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-solve focus-within:bg-white transition-colors">
           <span class="text-base font-bold text-smoke/65 flex-shrink-0 select-none">R$</span>
           <input type="number" id="snapshot-balance" name="balance" step="0.01" placeholder="0,00" required
                  class="flex-1 min-w-0 bg-transparent text-2xl font-black text-obsidian placeholder-slate-300 focus:outline-none tabular-nums">
         </div>
+        <p class="mt-1.5 text-xs text-smoke">Informe o valor total que você tem nesta conta — não apenas o que entrou ou saiu no mês.</p>
       </div>
 
       <!-- Notes — de-emphasised -->
@@ -653,9 +654,9 @@ function openSnapshotModal(accountId, accountName, accountColor, latestBalance, 
   const lastEl = document.getElementById('snapshot-last-balance');
   if (latestBalance !== null && latestBalance !== undefined) {
     const fmt = parseFloat(latestBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    lastEl.textContent = `Último saldo: R$ ${fmt}${latestMonth ? ' · ' + latestMonth : ''}`;
+    lastEl.textContent = `Último saldo patrimonial: R$ ${fmt}${latestMonth ? ' · ' + latestMonth : ''}`;
   } else {
-    lastEl.textContent = 'Sem saldo anterior registrado';
+    lastEl.textContent = 'Nenhum saldo registrado ainda';
   }
 
   // Pre-fill current month and clear balance

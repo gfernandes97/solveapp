@@ -48,6 +48,15 @@
         </svg>
         Transferência
       </button>
+      {% if investments %}
+      <button onclick="document.getElementById('modal-boleta-lanc').classList.remove('hidden')"
+              class="inline-flex items-center gap-2 rounded-lg border border-signal/30 bg-signal/5 px-3 py-2 text-sm font-semibold text-signal shadow-sm transition-colors hover:bg-signal/10">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        Boleta
+      </button>
+      {% endif %}
     </div>
   </div>
 
@@ -379,7 +388,11 @@
               {% endif %}
             </div>
             <div class="min-w-0">
-              <p class="text-sm font-medium text-obsidian truncate">{{ tx.description }}</p>
+              <p class="text-sm font-medium text-obsidian truncate">
+                {{ tx.description }}
+                {% if tx.is_investment %}<span class="ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold bg-signal/10 text-signal">Boleta</span>{% endif %}
+                {% if tx.is_transfer %}<span class="ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-600">Transfer.</span>{% endif %}
+              </p>
               <p class="text-xs text-smoke">
                 {{ tx.date|date:"d/m" }}
                 {% if tx.category %} · {{ tx.category.name }}{% endif %}
@@ -1066,5 +1079,73 @@ function openEditTx(pk, description, amount, dateVal, type, accountPk, categoryP
   document.getElementById('modal-editar-tx').classList.remove('hidden');
 }
 </script>
+
+{% if investments %}
+<!-- ─── Modal: Boleta (Lançamentos) ─── -->
+<div id="modal-boleta-lanc" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="font-black text-obsidian">Lançar boleta</h2>
+      <button onclick="document.getElementById('modal-boleta-lanc').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'investimento_boleta' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <div class="flex rounded-lg border border-slate-200 overflow-hidden">
+        <label class="flex-1 cursor-pointer">
+          <input type="radio" name="boleta_type" value="buy" class="sr-only peer" checked>
+          <span class="flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold text-smoke peer-checked:bg-signal peer-checked:text-white transition-colors">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+            Compra
+          </span>
+        </label>
+        <label class="flex-1 cursor-pointer border-l border-slate-200">
+          <input type="radio" name="boleta_type" value="sell" class="sr-only peer">
+          <span class="flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold text-smoke peer-checked:bg-red-500 peer-checked:text-white transition-colors">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+            Venda
+          </span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Ativo</label>
+        <select name="investment" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+          <option value="">Selecione…</option>
+          {% for inv in investments %}
+          <option value="{{ inv.pk }}">{{ inv.ticker|default:inv.name }}{% if inv.ticker %} — {{ inv.name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Conta de custódia</label>
+        <select name="account" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+          <option value="">Selecione…</option>
+          {% for acc in boleta_accounts %}
+          <option value="{{ acc.pk }}">{{ acc.name }} ({{ acc.get_type_display }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Quantidade</label>
+          <input type="number" name="quantity" step="0.000001" min="0.000001" required placeholder="1" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Preço unitário (R$)</label>
+          <input type="number" name="unit_price" step="0.01" min="0.01" required placeholder="0,00" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Data</label>
+        <input type="date" name="date" value="{{ today }}" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+      </div>
+      <button type="submit" class="w-full rounded-lg bg-signal py-3 text-sm font-black text-white transition-colors hover:bg-signal/90">
+        Confirmar boleta
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
 
 {% endblock %}

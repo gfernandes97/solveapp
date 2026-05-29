@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Account, Budget, Category, Goal, Investment, RecurringTransaction, Statement, Transaction
+from .models import Account, Budget, Category, Goal, Investment, InvestmentTransaction, RecurringTransaction, Statement, Transaction
 
 
 @admin.register(Account)
@@ -53,6 +53,15 @@ class InvestmentAdmin(admin.ModelAdmin):
     list_filter = ("type",)
     search_fields = ("name", "ticker", "user__email")
     raw_id_fields = ("user",)
+
+
+@admin.register(InvestmentTransaction)
+class InvestmentTransactionAdmin(admin.ModelAdmin):
+    list_display = ("investment", "type", "date", "amount", "quantity", "unit_price", "account", "user")
+    list_filter = ("type",)
+    search_fields = ("investment__name", "investment__ticker", "user__email")
+    raw_id_fields = ("user", "investment", "account")
+    date_hierarchy = "date"
 
 
 @admin.register(RecurringTransaction)

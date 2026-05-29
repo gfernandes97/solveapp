@@ -426,19 +426,26 @@
   ════════════════════════════════════ -->
   {% else %}
   <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
-    <div class="mb-5 flex flex-wrap items-center gap-5 text-xs text-smoke">
+    <div class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-smoke">
+      <!-- bar series → right axis (green) -->
       <span class="flex items-center gap-1.5">
-        <span class="inline-block h-3 w-3 rounded-sm" style="background:rgba(0,201,122,0.80)"></span>
-        Resultado Caixa
+        <span class="inline-block h-3 w-3 rounded-sm" style="background:rgba(0,201,122,0.85)"></span>
+        <span>Resultado Caixa</span>
+        <span class="rounded bg-solve/10 px-1 py-px text-[10px] font-semibold text-solve">eixo dir.</span>
       </span>
       <span class="flex items-center gap-1.5">
         <span class="inline-block h-3 w-3 rounded-sm" style="background:rgba(37,99,235,0.75)"></span>
-        Resultado Investimentos
+        <span>Resultado Investimentos</span>
+        <span class="rounded bg-solve/10 px-1 py-px text-[10px] font-semibold text-solve">eixo dir.</span>
       </span>
+      <!-- line series → left axis (obsidian) -->
       <span class="flex items-center gap-1.5">
-        <span class="inline-block h-3 w-0.5" style="background:#64748B"></span>
-        <span class="inline-block h-3 w-0.5 ml-0.5" style="background:#64748B"></span>
-        <span class="ml-1">Saldo Final (eixo esq.)</span>
+        <span class="inline-flex items-center gap-0.5">
+          <span class="inline-block h-0.5 w-3 rounded" style="background:#64748B"></span>
+          <span class="inline-block h-0.5 w-1.5 rounded" style="background:#7C3AED; margin-left:2px; border-top: 2px dashed #7C3AED; background:transparent"></span>
+        </span>
+        <span>Saldo Final</span>
+        <span class="rounded bg-obsidian/10 px-1 py-px text-[10px] font-semibold text-obsidian">eixo esq.</span>
       </span>
       <span class="ml-auto italic opacity-60">Barras claras = projeção</span>
     </div>
@@ -612,10 +619,11 @@ function toggleDrill(n) {
     return t === 'future' ? 'rgba(37,99,235,0.25)' : t === 'current' ? 'rgba(37,99,235,0.90)' : 'rgba(37,99,235,0.60)';
   }
   function balLineColor(t) {
-    return t === 'future' ? 'rgba(37,99,235,0.55)' : t === 'current' ? '#00C97A' : 'rgba(100,116,139,0.80)';
+    // violet for future (avoids conflict with investment blue bars)
+    return t === 'future' ? 'rgba(124,58,237,0.70)' : t === 'current' ? '#00C97A' : 'rgba(100,116,139,0.80)';
   }
   function balPointColor(t) {
-    return t === 'current' ? '#00C97A' : t === 'future' ? '#2563EB' : '#94A3B8';
+    return t === 'current' ? '#00C97A' : t === 'future' ? '#7C3AED' : '#94A3B8';
   }
 
   // ── Axis limits (both symmetric around 0 for zero-line alignment) ────────
@@ -722,14 +730,28 @@ function toggleDrill(n) {
           min: -maxBalAbs,
           max:  maxBalAbs,
           grid: { color: 'rgba(0,0,0,0.04)' },
-          ticks: { color: '#94A3B8', font: { size: 11 }, callback: fmtK },
+          title: {
+            display: true,
+            text: 'Saldo Final',
+            color: '#0F172A',
+            font: { size: 11, weight: '700' },
+            padding: { bottom: 4 },
+          },
+          ticks: { color: '#64748B', font: { size: 11 }, callback: fmtK },
         },
         y2: {
           position: 'right',
           min: -maxBarAbs,
           max:  maxBarAbs,
           grid: { drawOnChartArea: false },
-          ticks: { color: '#94A3B8', font: { size: 11 }, callback: fmtK },
+          title: {
+            display: true,
+            text: 'Resultado mensal',
+            color: '#00C97A',
+            font: { size: 11, weight: '700' },
+            padding: { bottom: 4 },
+          },
+          ticks: { color: '#00C97A', font: { size: 11 }, callback: fmtK },
         },
       },
     },

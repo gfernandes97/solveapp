@@ -190,10 +190,13 @@
     <div class="pointer-events-auto flex max-w-xs items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-lg"
          style="transition:opacity .3s,transform .3s" data-toast="{{ forloop.counter0 }}">
       <span class="text-2xl leading-none">{{ toast.icon }}</span>
-      <div class="min-w-0">
-        <p class="text-sm font-bold text-obsidian">Conquista desbloqueada!</p>
-        <p class="text-xs font-semibold text-obsidian">{{ toast.name }}</p>
-        <p class="text-xs text-smoke">{{ toast.description }}</p>
+      <div class="min-w-0 flex-1">
+        <p class="text-xs font-semibold text-smoke">Conquista evoluída!</p>
+        <p class="text-sm font-bold text-obsidian leading-tight">{{ toast.name }}</p>
+        <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold mt-0.5"
+              style="background-color:{{ toast.level_color }}20; color:{{ toast.level_color }}">
+          {{ toast.level_name }}
+        </span>
       </div>
       <span class="ml-auto flex-shrink-0 rounded-full bg-solve/10 px-2 py-0.5 text-xs font-bold text-solve">+{{ toast.points }}pts</span>
     </div>

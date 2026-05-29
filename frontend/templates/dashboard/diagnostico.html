@@ -190,83 +190,6 @@
     </div>
   </div>
 
-  <!-- Receitas + Gastos por categoria -->
-  <div class="grid gap-5 lg:grid-cols-2">
-
-    <!-- Receitas por Categoria -->
-    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
-      <div class="mb-4 flex items-center justify-between">
-        <div>
-          <h3 class="font-semibold text-obsidian">Receitas por Categoria</h3>
-          <p class="text-xs text-smoke">Variáveis + fixos</p>
-        </div>
-        <span class="text-xs font-semibold text-solve">R$&nbsp;{{ income|brl }}</span>
-      </div>
-      {% if all_inc_cat_data %}
-        <div class="flex justify-center">
-          <div class="relative h-48 w-48">
-            <canvas id="chart-inc-cat"></canvas>
-          </div>
-        </div>
-        <ul id="legend-inc-cat" class="mt-5 space-y-2.5">
-          {% for cat in all_inc_cat_data %}
-          <li class="flex items-center justify-between" data-idx="{{ forloop.counter0 }}">
-            <div class="flex min-w-0 items-center gap-2">
-              <span class="inc-dot h-2.5 w-2.5 flex-shrink-0 rounded-full"></span>
-              <span class="truncate text-sm text-obsidian">{{ cat.name }}</span>
-            </div>
-            <div class="ml-3 flex flex-shrink-0 items-center gap-3 text-xs">
-              <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
-              <span class="tabular-nums text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
-            </div>
-          </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <div class="flex flex-col items-center gap-2 py-8 text-center">
-          <p class="text-sm text-smoke">Nenhum lançamento com categoria</p>
-        </div>
-      {% endif %}
-    </div>
-
-    <!-- Gastos por Categoria -->
-    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
-      <div class="mb-4 flex items-center justify-between">
-        <div>
-          <h3 class="font-semibold text-obsidian">Gastos por Categoria</h3>
-          <p class="text-xs text-smoke">Variáveis + fixos</p>
-        </div>
-        <span class="text-xs font-semibold text-red-500">R$&nbsp;{{ expense|brl }}</span>
-      </div>
-      {% if all_exp_cat_data %}
-        <div class="flex justify-center">
-          <div class="relative h-48 w-48">
-            <canvas id="chart-exp-cat"></canvas>
-          </div>
-        </div>
-        <ul id="legend-exp-cat" class="mt-5 space-y-2.5">
-          {% for cat in all_exp_cat_data %}
-          <li class="flex items-center justify-between" data-idx="{{ forloop.counter0 }}">
-            <div class="flex min-w-0 items-center gap-2">
-              <span class="exp-dot h-2.5 w-2.5 flex-shrink-0 rounded-full"></span>
-              <span class="truncate text-sm text-obsidian">{{ cat.name }}</span>
-            </div>
-            <div class="ml-3 flex flex-shrink-0 items-center gap-3 text-xs">
-              <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
-              <span class="tabular-nums text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
-            </div>
-          </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <div class="flex flex-col items-center gap-2 py-8 text-center">
-          <p class="text-sm text-smoke">Nenhum lançamento com categoria</p>
-        </div>
-      {% endif %}
-    </div>
-
-  </div>
-
   <!-- Fixos comprometidos -->
   <div class="grid gap-5 lg:grid-cols-2">
 
@@ -340,6 +263,83 @@
         <div class="flex flex-col items-center gap-2 px-5 py-8 text-center">
           <p class="text-sm text-smoke">Nenhuma receita fixa cadastrada</p>
           <a href="{% url 'lancamentos' %}?tab=fixos" class="text-xs font-semibold text-solve hover:text-solve-dark transition-colors">Adicionar fixo</a>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Receitas + Gastos por categoria -->
+  <div class="grid gap-5 lg:grid-cols-2">
+
+    <!-- Receitas por Categoria -->
+    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h3 class="font-semibold text-obsidian">Receitas por Categoria</h3>
+          <p class="text-xs text-smoke">Variáveis + fixos</p>
+        </div>
+        <span class="text-xs font-semibold text-solve">R$&nbsp;{{ income|brl }}</span>
+      </div>
+      {% if all_inc_cat_data %}
+        <div class="flex justify-center">
+          <div class="relative h-48 w-48">
+            <canvas id="chart-inc-cat"></canvas>
+          </div>
+        </div>
+        <ul id="legend-inc-cat" class="mt-5 space-y-2.5">
+          {% for cat in all_inc_cat_data %}
+          <li class="flex items-center justify-between" data-idx="{{ forloop.counter0 }}">
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="inc-dot h-2.5 w-2.5 flex-shrink-0 rounded-full"></span>
+              <span class="truncate text-sm text-obsidian">{{ cat.name }}</span>
+            </div>
+            <div class="ml-3 flex flex-shrink-0 items-center gap-3 text-xs">
+              <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
+              <span class="tabular-nums text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="flex flex-col items-center gap-2 py-8 text-center">
+          <p class="text-sm text-smoke">Nenhum lançamento com categoria</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Gastos por Categoria -->
+    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h3 class="font-semibold text-obsidian">Gastos por Categoria</h3>
+          <p class="text-xs text-smoke">Variáveis + fixos</p>
+        </div>
+        <span class="text-xs font-semibold text-red-500">R$&nbsp;{{ expense|brl }}</span>
+      </div>
+      {% if all_exp_cat_data %}
+        <div class="flex justify-center">
+          <div class="relative h-48 w-48">
+            <canvas id="chart-exp-cat"></canvas>
+          </div>
+        </div>
+        <ul id="legend-exp-cat" class="mt-5 space-y-2.5">
+          {% for cat in all_exp_cat_data %}
+          <li class="flex items-center justify-between" data-idx="{{ forloop.counter0 }}">
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="exp-dot h-2.5 w-2.5 flex-shrink-0 rounded-full"></span>
+              <span class="truncate text-sm text-obsidian">{{ cat.name }}</span>
+            </div>
+            <div class="ml-3 flex flex-shrink-0 items-center gap-3 text-xs">
+              <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
+              <span class="tabular-nums text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="flex flex-col items-center gap-2 py-8 text-center">
+          <p class="text-sm text-smoke">Nenhum lançamento com categoria</p>
         </div>
       {% endif %}
     </div>

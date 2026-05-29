@@ -2,6 +2,8 @@ from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 
 class Account(models.Model):
@@ -122,6 +124,7 @@ class Transaction(models.Model):
     )
     is_transfer = models.BooleanField(default=False)
     transfer_ref = models.CharField(max_length=36, blank=True, db_index=True)
+    is_investment = models.BooleanField(default=False)
     # Preenchido quando a transação veio de um extrato importado
     imported_from = models.ForeignKey(
         "Statement", on_delete=models.SET_NULL, null=True, blank=True, related_name="transactions"
@@ -356,9 +359,50 @@ class Investment(models.Model):
         return self.current_value - self.total_invested
 
 
+class InvestmentTransaction(models.Model):
+    """Boleta de compra, venda ou rendimento de um ativo."""
+
+    TYPE_BUY = "buy"
+    TYPE_SELL = "sell"
+    TYPE_EARNINGS = "earnings"
+
+    TYPE_CHOICES = [
+        (TYPE_BUY, "Compra"),
+        (TYPE_SELL, "Venda"),
+        (TYPE_EARNINGS, "Rendimento"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="inv_transactions")
+    investment = models.ForeignKey(Investment, on_delete=models.CASCADE, related_name="boletas")
+    account = models.ForeignKey(
+        Account, on_delete=models.SET_NULL, null=True, blank=True, related_name="inv_transactions"
+    )
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    date = models.DateField()
+    quantity = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    cash_transaction = models.OneToOneField(
+        Transaction, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="inv_boleta",
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Boleta de Investimento"
+        verbose_name_plural = "Boletas de Investimento"
+
+    def __str__(self):
+        return f"{self.get_type_display()} {self.investment} — R${self.amount}"
+
+
 class UserAchievement(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="achievements")
     slug = models.CharField(max_length=50)
+    level = models.PositiveSmallIntegerField(default=1)
+    best_level = models.PositiveSmallIntegerField(default=1)
     unlocked_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -368,4 +412,15 @@ class UserAchievement(models.Model):
         verbose_name_plural = "Achievements"
 
     def __str__(self):
-        return f"{self.user.email} — {self.slug}"
+        return f"{self.user.email} — {self.slug} (lv{self.level})"
+
+
+# ─── Integrity signal ─────────────────────────────────────────────────────────
+# When an InvestmentTransaction is deleted (directly or via CASCADE from its
+# parent Investment), the linked Transaction must be removed too — otherwise
+# is_investment=True records accumulate without a matching boleta.
+@receiver(post_delete, sender=InvestmentTransaction)
+def _inv_tx_delete_cash_record(sender, instance, **kwargs):
+    cash_pk = instance.cash_transaction_id
+    if cash_pk:
+        Transaction.objects.filter(pk=cash_pk).delete()
