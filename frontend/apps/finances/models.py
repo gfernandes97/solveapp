@@ -324,6 +324,13 @@ class Investment(models.Model):
         (TYPE_OTHER, "Outros"),
     ]
 
+    TRACKING_FIN = "fin"
+    TRACKING_QP = "qp"
+    TRACKING_CHOICES = [
+        (TRACKING_FIN, "Financeiro"),
+        (TRACKING_QP, "Qtd × Preço"),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="investments")
     account = models.ForeignKey(
         Account, on_delete=models.SET_NULL, null=True, blank=True, related_name="investments"
@@ -331,6 +338,7 @@ class Investment(models.Model):
     name = models.CharField(max_length=100)
     ticker = models.CharField(max_length=20, blank=True)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    tracking_mode = models.CharField(max_length=3, choices=TRACKING_CHOICES, default=TRACKING_FIN)
     quantity = models.DecimalField(max_digits=12, decimal_places=6, default=1)
     purchase_price = models.DecimalField(max_digits=12, decimal_places=2)
     current_price = models.DecimalField(max_digits=12, decimal_places=2)
@@ -365,11 +373,13 @@ class InvestmentTransaction(models.Model):
     TYPE_BUY = "buy"
     TYPE_SELL = "sell"
     TYPE_EARNINGS = "earnings"
+    TYPE_DIVIDENDS = "dividends"
 
     TYPE_CHOICES = [
         (TYPE_BUY, "Compra"),
         (TYPE_SELL, "Venda"),
         (TYPE_EARNINGS, "Rendimento"),
+        (TYPE_DIVIDENDS, "Dividendo"),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="inv_transactions")

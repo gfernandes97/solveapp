@@ -13,6 +13,7 @@
     </div>
     <div class="flex gap-2 self-start sm:self-auto">
       <button onclick="openBoleta('buy')"
+              data-tour-action="novo-investimento"
               class="inline-flex items-center gap-2 rounded-lg bg-signal px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-signal/90">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -195,6 +196,9 @@
             </div>
             <div class="flex flex-shrink-0 items-center gap-2 ml-3">
               <div class="text-right">
+                {% if pos.display_qty and pos.display_unit_price %}
+                <p class="text-xs text-smoke tabular-nums">{{ pos.display_qty|floatformat:"-6" }}&nbsp;×&nbsp;R$&nbsp;{{ pos.display_unit_price|brl }}</p>
+                {% endif %}
                 <p class="text-sm font-bold text-obsidian">R$&nbsp;{{ pos.current_value|brl }}</p>
                 {% if pos.profit_loss %}
                 <p class="text-xs {% if pos.profit_loss >= 0 %}text-solve{% else %}text-red-500{% endif %}">
@@ -241,11 +245,13 @@
       <li class="flex items-center justify-between px-5 py-3">
         <div class="flex items-center gap-3 min-w-0">
           <div class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full
-            {% if b.type == 'buy' %}bg-signal/10{% elif b.type == 'sell' %}bg-red-50{% else %}bg-solve/10{% endif %}">
+            {% if b.type == 'buy' %}bg-signal/10{% elif b.type == 'sell' %}bg-red-50{% elif b.type == 'dividends' %}bg-solar/10{% else %}bg-solve/10{% endif %}">
             {% if b.type == 'buy' %}
             <svg class="h-3.5 w-3.5 text-signal" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
             {% elif b.type == 'sell' %}
             <svg class="h-3.5 w-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+            {% elif b.type == 'dividends' %}
+            <svg class="h-3.5 w-3.5 text-solar" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             {% else %}
             <svg class="h-3.5 w-3.5 text-solve" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
             {% endif %}
@@ -261,10 +267,10 @@
           </div>
         </div>
         <p class="flex-shrink-0 ml-3 text-sm font-bold
-          {% if b.type == 'sell' or b.amount >= 0 and b.type == 'earnings' %}text-solve
+          {% if b.type == 'sell' or b.type == 'dividends' or b.amount >= 0 and b.type == 'earnings' %}text-solve
           {% elif b.type == 'buy' %}text-obsidian
           {% else %}text-red-500{% endif %}">
-          {% if b.type == 'sell' %}+{% elif b.type == 'buy' %}-{% elif b.amount >= 0 %}+{% else %}{% endif %}R$&nbsp;{{ b.amount|brl }}
+          {% if b.type == 'sell' or b.type == 'dividends' %}+{% elif b.type == 'buy' %}-{% elif b.amount >= 0 %}+{% else %}{% endif %}R$&nbsp;{{ b.amount|brl }}
         </p>
       </li>
       {% endfor %}
@@ -275,16 +281,32 @@
 </div>
 
 <!-- ─── Modal: Boleta (Compra / Venda / Rendimento) ─── -->
+<script>
+const _INV_MODES  = {{ inv_modes_json|safe }};
+const _INV_PRICES = {{ inv_prices_json|safe }};
+const _INV_QTY    = {{ inv_qty_json|safe }};
+</script>
 <div id="modal-boleta" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
      x-data="{
-       btype:'buy', inv:'', acc:'', isNew:false, mode:'fin', qty:'', price:'', fin:'',
+       btype:'buy', inv:'', acc:'', isNew:false, mode:'fin', newMode:'fin',
+       qty:'', price:'', fin:'', newPrice:'', oldPrice:0,
+       get isQp()      { return this.isNew ? this.newMode==='qp' : _INV_MODES[this.inv]==='qp' },
+       get earnGain()  { const g=+this.qty * (+this.newPrice - this.oldPrice); return isNaN(g)?'—':g.toFixed(2) },
        onQty()  { if(+this.qty>0 && +this.price>0) this.fin=(+this.qty * +this.price).toFixed(2) },
        onPrice(){ if(+this.qty>0 && +this.price>0) this.fin=(+this.qty * +this.price).toFixed(2) },
        onType(t){ this.btype=t; if(t!=='buy' && this.inv==='new'){ this.inv=''; this.isNew=false } },
-       onInv(v) { this.isNew=(v==='new') },
-       setMode(m){ this.mode=m; this.qty=''; this.price=''; this.fin='' }
+       onInv(v) {
+         this.isNew=(v==='new');
+         if(!this.isNew && v){
+           this.mode = _INV_MODES[v] || 'fin';
+           this.oldPrice = _INV_PRICES[v] || 0;
+           this.qty = _INV_QTY[v] ? String(_INV_QTY[v]) : '';
+         }
+         this.price=''; this.fin=''; this.newPrice='';
+       },
+       setNewMode(m){ this.newMode=m; this.qty=''; this.price=''; this.fin='' }
      }"
-     @boleta-open.window="btype=($event.detail.type||'buy'); inv=String($event.detail.inv||''); acc=String($event.detail.acc||''); isNew=false; mode='fin'; qty=''; price=''; fin=''">
+     @boleta-open.window="btype=($event.detail.type||'buy'); inv=String($event.detail.inv||''); acc=String($event.detail.acc||''); isNew=false; newMode='fin'; qty=''; price=''; fin=''; newPrice=''; if(inv && _INV_MODES[inv]){ mode=_INV_MODES[inv]; oldPrice=_INV_PRICES[inv]||0; qty=_INV_QTY[inv]?String(_INV_QTY[inv]):'' } else { mode='fin'; oldPrice=0 }">
   <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
     <div class="flex items-center justify-between">
       <h2 class="font-black text-obsidian">Boleta</h2>
@@ -312,9 +334,15 @@
         </button>
         <button type="button" @click="onType('earnings')"
                 :class="btype==='earnings' ? 'bg-solve text-white' : 'text-smoke hover:bg-slate-50'"
-                class="flex-1 flex items-center justify-center gap-1.5 py-2.5 transition-colors">
+                class="flex-1 flex items-center justify-center gap-1.5 py-2.5 border-x border-slate-200 transition-colors">
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
           Rendimento
+        </button>
+        <button type="button" @click="onType('dividends')"
+                :class="btype==='dividends' ? 'bg-solar text-white' : 'text-smoke hover:bg-slate-50'"
+                class="flex-1 flex items-center justify-center gap-1.5 py-2.5 transition-colors">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Dividendo
         </button>
       </div>
 
@@ -354,12 +382,26 @@
                    class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
           </div>
         </div>
+        <!-- Modo de rastreamento — definido uma única vez na criação -->
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Modo de rastreamento</label>
+          <input type="hidden" name="new_mode" :value="newMode">
+          <div class="mt-1 flex overflow-hidden rounded-lg border border-slate-200 text-xs font-semibold">
+            <button type="button" @click="setNewMode('fin')"
+                    :class="newMode==='fin' ? 'bg-obsidian text-white' : 'text-smoke hover:bg-slate-50'"
+                    class="flex-1 py-2 transition-colors">Só financeiro</button>
+            <button type="button" @click="setNewMode('qp')"
+                    :class="newMode==='qp' ? 'bg-obsidian text-white' : 'text-smoke hover:bg-slate-50'"
+                    class="flex-1 border-l border-slate-200 py-2 transition-colors">Qtd × Preço</button>
+          </div>
+          <p class="mt-1 text-[10px] text-smoke/70">Não pode ser alterado depois da primeira compra.</p>
+        </div>
       </div>
 
       <!-- Conta (obrigatória para compra/venda, opcional para rendimento) -->
       <div>
         <label class="block text-xs font-semibold text-smoke">
-          Conta<span x-show="btype !== 'earnings'"> de custódia</span><span x-show="btype === 'earnings'" class="font-normal text-smoke/70"> (opcional)</span>
+          Conta<span x-show="btype !== 'earnings' && btype !== 'dividends'"> de custódia</span><span x-show="btype === 'earnings'" class="font-normal text-smoke/70"> (opcional)</span>
         </label>
         <select name="account" x-model="acc" :required="btype !== 'earnings'"
                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
@@ -371,64 +413,96 @@
       </div>
 
       <!-- Posição (compra/venda) -->
-      <div x-show="btype !== 'earnings'" class="space-y-2">
-        <!-- Mode toggle -->
-        <div class="flex overflow-hidden rounded-lg border border-slate-200 text-xs font-semibold">
-          <button type="button" @click="setMode('fin')"
-                  :class="mode==='fin' ? 'bg-obsidian text-white' : 'text-smoke hover:bg-slate-50'"
-                  class="flex-1 py-2 transition-colors">Só financeiro</button>
-          <button type="button" @click="setMode('qp')"
-                  :class="mode==='qp' ? 'bg-obsidian text-white' : 'text-smoke hover:bg-slate-50'"
-                  class="flex-1 border-l border-slate-200 py-2 transition-colors">Qtd × Preço</button>
-        </div>
+      <div x-show="btype !== 'earnings' && btype !== 'dividends'" class="space-y-2">
+        <!-- Mode indicator: locked for existing assets, toggle for new -->
+        <template x-if="!isNew && inv && !isNew">
+          <div class="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+            <span class="font-semibold text-smoke">Modo:</span>
+            <span x-text="isQp ? 'Qtd × Preço' : 'Só financeiro'" class="font-bold text-obsidian"></span>
+            <span class="ml-auto text-smoke/60">definido na criação do ativo</span>
+          </div>
+        </template>
+
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
           <!-- Só financeiro -->
-          <div x-show="mode === 'fin'">
+          <div x-show="!isQp">
             <label class="block text-xs font-semibold text-signal">Financeiro (R$)</label>
             <input type="number" name="financeiro" step="0.01" min="0.01" placeholder="0,00"
                    x-model="fin"
-                   :required="mode === 'fin' && btype !== 'earnings'"
-                   :disabled="mode !== 'fin'"
+                   :required="!isQp && btype !== 'earnings'"
+                   :disabled="isQp"
                    class="mt-1 w-full rounded-lg border border-signal/40 bg-white px-3 py-2.5 text-sm font-semibold text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
           </div>
           <!-- Qtd × Preço -->
-          <div x-show="mode === 'qp'">
+          <div x-show="isQp">
             <div class="flex items-end gap-1.5">
               <div class="flex-1 min-w-0">
                 <label class="block text-xs font-semibold text-smoke">Quantidade</label>
-                <input type="number" name="quantity" step="0.000001" min="0.000001" placeholder="0"
+                <input type="number" name="quantity" step="any" min="0" placeholder="0"
                        x-model="qty" @input="onQty()"
-                       :required="mode === 'qp' && btype !== 'earnings'"
-                       :disabled="mode !== 'qp'"
+                       :required="isQp && btype !== 'earnings'"
+                       :disabled="!isQp"
                        class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
               </div>
               <span class="mb-2.5 flex-shrink-0 text-base font-light text-slate-400">×</span>
               <div class="flex-1 min-w-0">
                 <label class="block text-xs font-semibold text-smoke">Preço unit.</label>
-                <input type="number" name="unit_price" step="0.000001" min="0.000001" placeholder="0,00"
+                <input type="number" name="unit_price" step="any" min="0" placeholder="0,00"
                        x-model="price" @input="onPrice()"
-                       :required="mode === 'qp' && btype !== 'earnings'"
-                       :disabled="mode !== 'qp'"
+                       :required="isQp && btype !== 'earnings'"
+                       :disabled="!isQp"
                        class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
               </div>
             </div>
             <p x-show="qty > 0 && price > 0" class="mt-2 text-right text-xs text-smoke">
               = R$ <span x-text="(+qty * +price).toFixed(2)" class="font-semibold text-obsidian"></span>
             </p>
-            <!-- Computed financeiro submitted as hidden when in qp mode -->
-            <input type="hidden" name="financeiro"
-                   :value="qty > 0 && price > 0 ? (+qty * +price).toFixed(2) : ''"
-                   :disabled="mode !== 'qp'">
           </div>
         </div>
       </div>
 
-      <!-- Rendimento: valor único -->
+      <!-- Rendimento -->
       <div x-show="btype === 'earnings'">
-        <label class="block text-xs font-semibold text-smoke">Valor (R$) — negativo para perda</label>
-        <input type="number" name="amount" step="0.01" placeholder="Ex: 150,00 ou -50,00"
-               :required="btype === 'earnings'"
-               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        <!-- fin mode: direct amount -->
+        <div x-show="!isQp">
+          <label class="block text-xs font-semibold text-smoke">Valor (R$) — negativo para perda</label>
+          <input type="number" name="amount" step="0.01" placeholder="Ex: 150,00 ou -50,00"
+                 :required="btype === 'earnings' && !isQp"
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </div>
+        <!-- qp mode: old price + new price → gain calculated automatically -->
+        <div x-show="isQp" class="space-y-2">
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-smoke">Preço anterior (R$)</label>
+                <input type="number" :value="oldPrice.toFixed(2)" disabled
+                       class="mt-1 w-full rounded-lg border border-slate-100 bg-slate-100 px-3 py-2 text-sm text-smoke cursor-not-allowed">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-signal">Novo preço (R$)</label>
+                <input type="number" name="new_price" step="0.000001" min="0" placeholder="0,00"
+                       x-model="newPrice"
+                       :required="btype === 'earnings' && isQp"
+                       class="mt-1 w-full rounded-lg border border-signal/40 bg-white px-3 py-2 text-sm font-semibold text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+              </div>
+            </div>
+            <div class="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs border border-slate-200">
+              <span class="text-smoke">Qtd × variação =</span>
+              <span :class="(+newPrice - oldPrice) >= 0 ? 'text-solve font-bold' : 'text-red-500 font-bold'"
+                    x-text="newPrice ? ((+qty||0) * (+newPrice - oldPrice) >= 0 ? '+' : '') + ((+qty||0) * (+newPrice - oldPrice)).toFixed(2) : '—'"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dividendo -->
+      <div x-show="btype === 'dividends'">
+        <label class="block text-xs font-semibold text-smoke">Valor recebido (R$)</label>
+        <input type="number" name="amount" step="0.01" min="0.01" placeholder="Ex: 150,00"
+               :required="btype === 'dividends'"
+               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solar focus:outline-none focus:ring-1 focus:ring-solar">
+        <p class="mt-1 text-[10px] text-smoke/60">Lançado como crédito na conta. Não altera o valor de portfólio do ativo.</p>
       </div>
 
       <!-- Data -->
@@ -446,9 +520,9 @@
       </div>
 
       <button type="submit"
-              :class="btype==='sell' ? 'bg-red-500 hover:bg-red-600' : btype==='earnings' ? 'bg-solve hover:bg-solve-dark' : 'bg-signal hover:bg-signal/90'"
+              :class="btype==='sell' ? 'bg-red-500 hover:bg-red-600' : btype==='earnings' ? 'bg-solve hover:bg-solve-dark' : btype==='dividends' ? 'bg-solar hover:bg-solar/90' : 'bg-signal hover:bg-signal/90'"
               class="w-full rounded-lg py-3 text-sm font-black text-white transition-colors">
-        <span x-text="btype==='buy' ? 'Confirmar compra' : btype==='sell' ? 'Confirmar venda' : 'Registrar rendimento'"></span>
+        <span x-text="btype==='buy' ? 'Confirmar compra' : btype==='sell' ? 'Confirmar venda' : btype==='dividends' ? 'Registrar dividendo' : 'Registrar rendimento'"></span>
       </button>
     </form>
   </div>

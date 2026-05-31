@@ -74,7 +74,7 @@ ACHIEVEMENTS = {
         "name": "Setup Completo",
         "description": "Configurou o perfil financeiro",
         "icon": "🚀",
-        "viva": False,
+        "viva": True,
         "thresholds":        [1, 2, 3, 4],
         "tier_pts":          [150, 250, 400, 650],
         "criterion_labels":  ["Conta + saldo registrado",
@@ -335,7 +335,7 @@ def check_achievements(user, request=None):
     _update_level(user, "first_investment",
                   _tlevel(Investment.objects.filter(user=user).count(), [1, 3, 5, 10]),
                   False, request)
-    _update_level(user, "setup_complete", _setup_steps(user), False, request)
+    _update_level(user, "setup_complete", _setup_steps(user), True, request)
 
     _update_level(user, "fixos_configured",
                   _tlevel(RecurringTransaction.objects.filter(user=user, is_active=True).count(),

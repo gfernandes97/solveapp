@@ -726,6 +726,7 @@ def investimentos(request):
     inv_by_type: dict = {}
     inv_total = Decimal("0")
     _by_acc: dict = {}
+    _inv_current_total: dict = {}  # {investment_id: current_value} for effective price calc
 
     for row in tx_agg:
         inv_obj = inv_map.get(row["investment_id"])
@@ -738,14 +739,20 @@ def investimentos(request):
         if current <= 0:
             continue  # fully exited position — skip
 
+        _inv_current_total[row["investment_id"]] = _inv_current_total.get(row["investment_id"], Decimal("0")) + current
+
         key = row["account_id"] or 0
         if key not in _by_acc:
             _by_acc[key] = {"account": acc_obj, "positions": [], "total": Decimal("0"), "cost": Decimal("0")}
+        qty = inv_obj.quantity if inv_obj.tracking_mode == Investment.TRACKING_QP else None
+        unit_price = (current / qty).quantize(Decimal("0.01")) if qty and qty > 0 else None
         _by_acc[key]["positions"].append({
             "inv": inv_obj,
             "current_value": current,
             "cost": cost,
             "profit_loss": earn,
+            "display_qty": qty,
+            "display_unit_price": unit_price,
         })
         _by_acc[key]["total"] += current
         _by_acc[key]["cost"] += cost
@@ -771,6 +778,15 @@ def investimentos(request):
         .order_by("-date", "-created_at")[:20]
     )
 
+    inv_modes_json = json.dumps({str(i.pk): i.tracking_mode for i in investments})
+
+    def _effective_price(inv_obj):
+        if inv_obj.tracking_mode == Investment.TRACKING_QP and inv_obj.quantity > 0:
+            total_val = _inv_current_total.get(inv_obj.pk, Decimal("0"))
+            if total_val > 0:
+                return float((total_val / inv_obj.quantity).quantize(Decimal("0.000001")))
+        return float(inv_obj.current_price)
+
     return render(request, "dashboard/investimentos.html", {
         "cash_accounts": cash_accounts,
         "cash_balance": cash_balance,
@@ -785,6 +801,9 @@ def investimentos(request):
         "investment_types": Investment.TYPE_CHOICES,
         "boleta_accounts": boleta_accounts,
         "recent_boletas": recent_boletas,
+        "inv_modes_json": inv_modes_json,
+        "inv_prices_json": json.dumps({str(i.pk): _effective_price(i) for i in investments}),
+        "inv_qty_json": json.dumps({str(i.pk): float(i.quantity) for i in investments}),
     })
 
 
@@ -997,6 +1016,7 @@ def lancamento_editar(request, pk):
         else:
             acc.balance -= amount
         acc.save(update_fields=["balance"])
+        ach.check_achievements(request.user, request)
 
     return redirect("lancamentos")
 
@@ -1036,6 +1056,7 @@ def lancamento_excluir(request, pk):
             pair_acc.save(update_fields=["balance"])
             pair.delete()
     tx.delete()
+    ach.check_achievements(request.user, request)
     return redirect("lancamentos")
 
 
@@ -1172,6 +1193,7 @@ def fixo_editar(request, pk):
             rt.goal = None
         rt.notes = request.POST.get("notes", rt.notes).strip()
         rt.save()
+        ach.check_achievements(request.user, request)
     return redirect("/dashboard/lancamentos/?tab=fixos")
 
 
@@ -1180,6 +1202,7 @@ def fixo_editar(request, pk):
 def fixo_excluir(request, pk):
     rt = get_object_or_404(RecurringTransaction, pk=pk, user=request.user)
     rt.delete()
+    ach.check_achievements(request.user, request)
     return redirect("/dashboard/lancamentos/?tab=fixos")
 
 
@@ -1316,6 +1339,7 @@ def snapshot_criar(request):
 def snapshot_excluir(request, pk):
     snap = get_object_or_404(AccountMonthSnapshot, pk=pk, account__user=request.user)
     snap.delete()
+    ach.check_achievements(request.user, request)
     return redirect("contas")
 
 
@@ -1510,6 +1534,7 @@ def meta_editar(request, pk):
 @require_POST
 def meta_excluir(request, pk):
     get_object_or_404(Goal, pk=pk, user=request.user).delete()
+    ach.check_achievements(request.user, request)
     return redirect("metas")
 
 
@@ -1571,6 +1596,7 @@ def investimento_criar(request):
 @require_POST
 def investimento_excluir(request, pk):
     get_object_or_404(Investment, pk=pk, user=request.user).delete()
+    ach.check_achievements(request.user, request)
     return redirect("investimentos")
 
 
@@ -1608,7 +1634,12 @@ def investimento_editar(request, pk):
 def investimento_boleta(request):
     """Unified boleta: BUY, SELL, or EARNINGS. Also handles inline new-asset creation for BUY."""
     boleta_type = request.POST.get("boleta_type", InvestmentTransaction.TYPE_BUY)
-    if boleta_type not in (InvestmentTransaction.TYPE_BUY, InvestmentTransaction.TYPE_SELL, InvestmentTransaction.TYPE_EARNINGS):
+    if boleta_type not in (
+        InvestmentTransaction.TYPE_BUY,
+        InvestmentTransaction.TYPE_SELL,
+        InvestmentTransaction.TYPE_EARNINGS,
+        InvestmentTransaction.TYPE_DIVIDENDS,
+    ):
         return redirect("investimentos")
 
     tx_date = _dt(request.POST.get("date")) or _now_br().date()
@@ -1635,12 +1666,16 @@ def investimento_boleta(request):
             return redirect("investimentos")
         inv_type = request.POST.get("new_type", Investment.TYPE_OTHER)
         ticker = request.POST.get("new_ticker", "").strip().upper()
+        new_mode = request.POST.get("new_mode", Investment.TRACKING_FIN)
+        if new_mode not in (Investment.TRACKING_FIN, Investment.TRACKING_QP):
+            new_mode = Investment.TRACKING_FIN
         inv = Investment.objects.create(
             user=request.user,
             account=account,
             name=name,
             ticker=ticker or "",
             type=inv_type,
+            tracking_mode=new_mode,
             quantity=Decimal("0"),
             purchase_price=Decimal("0"),
             current_price=Decimal("0"),
@@ -1658,13 +1693,43 @@ def investimento_boleta(request):
 
     # ── EARNINGS ──────────────────────────────────────────────────────────────
     if boleta_type == InvestmentTransaction.TYPE_EARNINGS:
-        try:
-            amount = Decimal(str(request.POST.get("amount", "0")).replace(",", "."))
-        except (InvalidOperation, TypeError):
-            return redirect("investimentos")
-        if inv.quantity > 0:
-            inv.current_price = inv.current_price + amount / inv.quantity
+        if inv.tracking_mode == Investment.TRACKING_QP:
+            # qp mode: user supplies new_price; gain = qty × (new_price − old_price)
+            try:
+                new_price = Decimal(str(request.POST.get("new_price", "0")).replace(",", "."))
+            except (InvalidOperation, TypeError):
+                return redirect("investimentos")
+            # Derive old_price from transaction history (same formula the modal uses),
+            # not from inv.current_price which may lag after multiple buys.
+            if inv.quantity > 0:
+                _agg = InvestmentTransaction.objects.filter(
+                    user=request.user, investment=inv
+                ).aggregate(
+                    buy_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_BUY)),
+                    sell_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_SELL)),
+                    earn_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_EARNINGS)),
+                )
+                _current_val = (
+                    (_agg["buy_total"] or Decimal("0"))
+                    - (_agg["sell_total"] or Decimal("0"))
+                    + (_agg["earn_total"] or Decimal("0"))
+                )
+                old_price = _current_val / inv.quantity
+            else:
+                old_price = inv.current_price
+            amount = inv.quantity * (new_price - old_price)
+            inv.current_price = new_price
             inv.save(update_fields=["current_price"])
+        else:
+            # fin mode: direct financial amount
+            try:
+                amount = Decimal(str(request.POST.get("amount", "0")).replace(",", "."))
+            except (InvalidOperation, TypeError):
+                return redirect("investimentos")
+            if inv.quantity > 0:
+                inv.current_price = inv.current_price + amount / inv.quantity
+                inv.save(update_fields=["current_price"])
+
         earn_tx = None
         if account:
             earn_tx = Transaction.objects.create(
@@ -1689,61 +1754,89 @@ def investimento_boleta(request):
         )
         return redirect("investimentos")
 
+    # ── DIVIDENDS ─────────────────────────────────────────────────────────────
+    if boleta_type == InvestmentTransaction.TYPE_DIVIDENDS:
+        try:
+            amount = Decimal(str(request.POST.get("amount", "0")).replace(",", "."))
+        except (InvalidOperation, TypeError):
+            return redirect("investimentos")
+        if amount <= 0:
+            return redirect("investimentos")
+        div_tx = None
+        if account:
+            div_tx = Transaction.objects.create(
+                account=account,
+                amount=amount,
+                type=Transaction.TYPE_CREDIT,
+                date=tx_date,
+                description=f"Dividendo: {inv.ticker or inv.name}",
+                notes=notes,
+                status=Transaction.STATUS_COMPLETED,
+                is_investment=True,
+            )
+        InvestmentTransaction.objects.create(
+            user=request.user,
+            investment=inv,
+            account=account,
+            type=InvestmentTransaction.TYPE_DIVIDENDS,
+            date=tx_date,
+            amount=amount,
+            cash_transaction=div_tx,
+            notes=notes,
+        )
+        return redirect("investimentos")
+
     # ── BUY / SELL ────────────────────────────────────────────────────────────
     if not account:
         return redirect("investimentos")
 
+    is_qp = inv.tracking_mode == Investment.TRACKING_QP
     qty_raw = _d(request.POST.get("quantity"), Decimal("0"))
     unit_price_raw = _d(request.POST.get("unit_price"), Decimal("0"))
     financeiro = _d(request.POST.get("financeiro"), Decimal("0"))
 
-    # fin_only: user entered only a financial amount, no real unit quantity.
-    # In this mode the position is tracked as qty=1 with purchase_price/current_price
-    # representing the *total* financial value, not price-per-unit.
-    fin_only = qty_raw <= 0
-
-    if qty_raw > 0 and unit_price_raw > 0:
-        total = qty_raw * unit_price_raw
-        qty = qty_raw
-        up = unit_price_raw
-    elif qty_raw > 0 and financeiro > 0:
-        total = financeiro
-        qty = qty_raw
-        up = financeiro / qty_raw
-    elif financeiro > 0:
-        total = financeiro
-        qty = None
-        up = None
+    if is_qp:
+        if qty_raw > 0 and unit_price_raw > 0:
+            total = qty_raw * unit_price_raw
+            qty = qty_raw
+            up = unit_price_raw
+        else:
+            return redirect("investimentos")
     else:
-        return redirect("investimentos")
+        if financeiro > 0:
+            total = financeiro
+            qty = None
+            up = None
+        else:
+            return redirect("investimentos")
 
     if boleta_type == InvestmentTransaction.TYPE_BUY:
         tx_type = Transaction.TYPE_DEBIT
         description = f"Compra: {inv.ticker or inv.name}"
-        if fin_only:
-            if inv.quantity <= 0:
-                inv.quantity = Decimal("1")
-            inv.purchase_price += total
-            inv.current_price += total
-        else:
+        if is_qp:
             old_qty = inv.quantity
             new_qty = old_qty + qty
             if new_qty > 0:
                 inv.purchase_price = (old_qty * inv.purchase_price + qty * up) / new_qty
             inv.quantity = new_qty
             inv.current_price = up
-        inv.account = account  # custódia follows the boleta account
+        else:
+            if inv.quantity <= 0:
+                inv.quantity = Decimal("1")
+            inv.purchase_price += total
+            inv.current_price += total
+        inv.account = account
         inv.save()
     else:
         tx_type = Transaction.TYPE_CREDIT
         description = f"Venda: {inv.ticker or inv.name}"
-        if fin_only:
+        if is_qp:
+            inv.quantity = max(Decimal("0"), inv.quantity - qty)
+            inv.save(update_fields=["quantity"])
+        else:
             inv.purchase_price = max(Decimal("0"), inv.purchase_price - total)
             inv.current_price = max(Decimal("0"), inv.current_price - total)
             inv.save()
-        else:
-            inv.quantity = max(Decimal("0"), inv.quantity - qty)
-            inv.save(update_fields=["quantity"])
 
     cash_tx = Transaction.objects.create(
         account=account,
@@ -1921,6 +2014,25 @@ def projecao(request):
             _delta if _row["type"] == "credit" else -_delta
         )
 
+    # Dividends: always financial, always impact cash, excluded from portfolio value.
+    # Their cash transactions are is_investment=True so they're not in per_acc_tx_raw above.
+    _div_raw = (
+        InvestmentTransaction.objects.filter(
+            user=request.user,
+            type=InvestmentTransaction.TYPE_DIVIDENDS,
+            account__isnull=False,
+            date__gte=tx_query_start,
+            date__lt=_add_months(end_month, 1),
+        )
+        .annotate(mo=TruncMonth("date"))
+        .values("account_id", "mo")
+        .annotate(total=Sum("amount"))
+    )
+    for _row in _div_raw:
+        _mo = (_row["mo"] if isinstance(_row["mo"], date) else _row["mo"].date()).replace(day=1)
+        _key = (_row["account_id"], _mo)
+        acc_month_net[_key] = acc_month_net.get(_key, Decimal("0")) + (_row["total"] or Decimal("0"))
+
     # Earnings from InvestmentTransaction — contributes to inv_result in the forward pass.
     _earn_raw = (
         InvestmentTransaction.objects.filter(
@@ -1939,6 +2051,8 @@ def projecao(request):
         inv_earnings_by_month[_m] = _row["total"] or Decimal("0")
 
     # Individual transactions per account per month — for the drill-down detail view.
+    # Includes investment transactions (is_investment=True) for visibility; they are
+    # rendered as informational rows and excluded from the running balance calculation.
     tx_detail_qs = (
         Transaction.objects.filter(
             account__user=request.user,
@@ -1948,9 +2062,8 @@ def projecao(request):
             status=Transaction.STATUS_COMPLETED,
             date__gte=tx_query_start,
             date__lt=_add_months(end_month, 1),
-            is_investment=False,
         )
-        .select_related("account", "category")
+        .select_related("account", "category", "inv_boleta")
         .order_by("date", "id")
     )
     tx_by_acc_month: dict = {}  # {(account_id, month): [Transaction]}
@@ -2209,8 +2322,8 @@ def projecao(request):
             _run = opening_bal.get(acc_id)  # None when account has no prior snapshot
             _has_run = _run is not None
             _entries = []
-            for _e_credit, _e_debit, _e_date, _e_desc, _e_is_rec, _e_cat, _e_is_transfer in items_iter:
-                if _has_run:
+            for _e_credit, _e_debit, _e_date, _e_desc, _e_is_rec, _e_cat, _e_is_transfer, _e_is_inv, _e_is_earn in items_iter:
+                if _has_run and not _e_is_earn:
                     _run += _e_credit - _e_debit
                 _entries.append({
                     "date": _e_date,
@@ -2219,8 +2332,10 @@ def projecao(request):
                     "debit": _e_debit,
                     "is_recurring": _e_is_rec,
                     "is_transfer": _e_is_transfer,
+                    "is_investment": _e_is_inv,
+                    "is_earnings": _e_is_earn,
                     "category_name": _e_cat,
-                    "running_balance": _run,
+                    "running_balance": _run if not _e_is_earn else None,
                 })
             return _entries
 
@@ -2238,7 +2353,7 @@ def projecao(request):
                         Decimal("0") if _income else _amt,
                         None, _r.name, True,
                         _r.category.name if _r.category else None,
-                        False,
+                        False, False, False,
                     ))
             else:
                 _raw = []
@@ -2254,23 +2369,29 @@ def projecao(request):
                         Decimal("0") if _income else _amt,
                         _proj_date(_r, mo), _r.name, True,
                         _r.category.name if _r.category else None,
-                        False,
+                        False, False, False,
                     ))
                 # Actual transaction records
                 for _tx in tx_by_acc_month.get((_did, mo), []):
                     _isc = _tx.type == Transaction.TYPE_CREDIT
+                    try:
+                        _is_earn = _tx.inv_boleta.type == InvestmentTransaction.TYPE_EARNINGS
+                    except InvestmentTransaction.DoesNotExist:
+                        _is_earn = False
                     _raw.append((
                         _tx.amount if _isc else Decimal("0"),
                         Decimal("0") if _isc else _tx.amount,
                         _tx.date, _tx.description, _tx.is_recurring,
                         _tx.category.name if _tx.category else None,
-                        _tx.is_transfer,
+                        _tx.is_transfer, _tx.is_investment, _is_earn,
                     ))
                 # Sort: actual transactions (have date) first; recurring projections last
                 _raw.sort(key=lambda x: (x[2] is None, x[2] or date.min))
             _entries = _build_drill_entries(_raw, row["is_future"], _did)
-            _tc = sum(e["credit"] for e in _entries)
-            _td = sum(e["debit"] for e in _entries)
+            _tc = sum(e["credit"] for e in _entries if not e["is_earnings"])
+            _td = sum(e["debit"] for e in _entries if not e["is_earnings"])
+            _cash_count = sum(1 for e in _entries if not e["is_investment"])
+            _inv_count = sum(1 for e in _entries if e["is_investment"])
             drill_accounts.append({
                 "id": _did,
                 "name": per_acc_names.get(_did, f"Conta {_did}"),
@@ -2280,6 +2401,8 @@ def projecao(request):
                 "total_debit": _td,
                 "total_net": _tc - _td,
                 "opening_balance": opening_bal.get(_did),
+                "cash_tx_count": _cash_count,
+                "inv_tx_count": _inv_count,
             })
 
         # Unassigned recurring (no account) — shown for all months, not just future
@@ -2298,7 +2421,7 @@ def projecao(request):
                     Decimal("0") if _income else _amt,
                     _proj_d, _r.name, True,
                     _r.category.name if _r.category else None,
-                    False,
+                    False, False, False,
                 ))
             _entries = _build_drill_entries(_raw, row["is_future"], None)
             _tc = sum(e["credit"] for e in _entries)
@@ -2312,6 +2435,8 @@ def projecao(request):
                 "total_debit": _td,
                 "total_net": _tc - _td,
                 "opening_balance": None,
+                "cash_tx_count": len(_entries),
+                "inv_tx_count": 0,
             })
 
         row["end_balance"] = end_balance
@@ -2342,6 +2467,10 @@ def projecao(request):
         type__in=_CUSTODY_TYPES,
     ).order_by("name")
 
+    categories = Category.objects.filter(
+        Q(user=request.user) | Q(user__isnull=True)
+    ).order_by("type", "name")
+
     return render(request, "dashboard/projecao.html", {
         "rows": rows,
         "n_past": n_past,
@@ -2355,6 +2484,7 @@ def projecao(request):
         "chart_data": chart_data,
         "warnings_count": warnings_count,
         "cash_accounts": cash_accounts,
+        "categories": categories,
     })
 
 

@@ -60,25 +60,25 @@
       {% url 'metas'        as url_metas %}
       {% url 'settings'     as url_settings %}
 
-      <a href="{{ url_dashboard }}"
+      <a href="{{ url_dashboard }}" data-tour="dashboard"
          class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
          {% if request.path == url_dashboard %}bg-white/10 text-white{% else %}text-white/55 hover:bg-white/5 hover:text-white{% endif %}">
         <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
         Visão geral
       </a>
-      <a href="{{ url_investimentos }}"
+      <a href="{{ url_investimentos }}" data-tour="investimentos"
          class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
          {% if request.path == url_investimentos %}bg-white/10 text-white{% else %}text-white/55 hover:bg-white/5 hover:text-white{% endif %}">
         <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
         Investimentos
       </a>
-      <a href="{{ url_lancamentos }}"
+      <a href="{{ url_lancamentos }}" data-tour="lancamentos"
          class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
          {% if request.path == url_lancamentos %}bg-white/10 text-white{% else %}text-white/55 hover:bg-white/5 hover:text-white{% endif %}">
         <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
         Lançamentos
       </a>
-      <a href="{{ url_diagnostico }}"
+      <a href="{{ url_diagnostico }}" data-tour="diagnostico"
          class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
          {% if request.path == url_diagnostico %}bg-white/10 text-white{% else %}text-white/55 hover:bg-white/5 hover:text-white{% endif %}">
         <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,19 +89,19 @@
         </svg>
         Diagnóstico
       </a>
-      <a href="{{ url_projecao }}"
+      <a href="{{ url_projecao }}" data-tour="projecao"
          class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
          {% if request.path == url_projecao %}bg-white/10 text-white{% else %}text-white/55 hover:bg-white/5 hover:text-white{% endif %}">
         <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
         Projeção
       </a>
-      <a href="{{ url_contas }}"
+      <a href="{{ url_contas }}" data-tour="contas"
          class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
          {% if request.path == url_contas %}bg-white/10 text-white{% else %}text-white/55 hover:bg-white/5 hover:text-white{% endif %}">
         <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
         Contas
       </a>
-      <a href="{{ url_metas }}"
+      <a href="{{ url_metas }}" data-tour="metas"
          class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
          {% if request.path == url_metas %}bg-white/10 text-white{% else %}text-white/55 hover:bg-white/5 hover:text-white{% endif %}">
         <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -214,6 +214,9 @@
   })();
   </script>
   {% endif %}
+
+  <!-- ─── Sol: Assistente Virtual ─── -->
+  {% include "dashboard/_sol_assistant.html" %}
 
 </div>
 {% endblock %}

@@ -28,6 +28,7 @@
     <!-- Botões de ação -->
     <div class="flex flex-wrap gap-2">
       <button onclick="document.getElementById('modal-entrada').classList.remove('hidden')"
+              data-tour-action="novo-lancamento"
               class="inline-flex items-center gap-2 rounded-lg bg-solve px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-solve-dark">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
@@ -106,6 +107,7 @@
     <div class="flex border-b border-slate-100">
       {% for slug, label in tab_defs %}
       <a href="?ano={{ year }}&mes={{ month }}&tab={{ slug }}"
+         {% if slug == "fixos" %}data-tour-action="aba-fixos"{% endif %}
          class="px-4 py-3 text-sm font-medium transition-colors border-b-2
          {% if tab == slug %}border-solve text-solve{% else %}border-transparent text-smoke hover:text-obsidian{% endif %}">
         {{ label }}
@@ -122,6 +124,7 @@
             <p class="text-xs text-smoke mt-0.5">Entradas e saídas recorrentes automatizadas</p>
           </div>
           <button onclick="document.getElementById('modal-recorrente').classList.remove('hidden')"
+                  data-tour-action="novo-fixo"
                   class="inline-flex items-center gap-1.5 rounded-lg bg-obsidian px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-obsidian/90">
             <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -483,9 +486,9 @@
         </select>
       </div>
       <div>
-        <label class="block text-xs font-semibold text-smoke">Categoria (opcional)</label>
-        <select name="category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
-          <option value="">Sem categoria</option>
+        <label class="block text-xs font-semibold text-smoke">Categoria</label>
+        <select name="category" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="" disabled selected>Selecione…</option>
           {% for cat in categories %}{% if cat.type == "income" %}
           <option value="{{ cat.id }}">{{ cat.name }}</option>
           {% endif %}{% endfor %}
@@ -551,9 +554,9 @@
         </select>
       </div>
       <div>
-        <label class="block text-xs font-semibold text-smoke">Categoria (opcional)</label>
-        <select name="category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
-          <option value="">Sem categoria</option>
+        <label class="block text-xs font-semibold text-smoke">Categoria</label>
+        <select name="category" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="" disabled selected>Selecione…</option>
           {% for cat in categories %}{% if cat.type == "expense" %}
           <option value="{{ cat.id }}">{{ cat.name }}</option>
           {% endif %}{% endfor %}
@@ -643,9 +646,9 @@
         </div>
       </div>
       <div>
-        <label class="block text-xs font-semibold text-smoke">Categoria (opcional)</label>
-        <select name="category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
-          <option value="">Sem categoria</option>
+        <label class="block text-xs font-semibold text-smoke">Categoria</label>
+        <select name="category" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="" disabled selected>Selecione…</option>
           <optgroup label="Entradas">
             {% for cat in categories %}{% if cat.type == "income" %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endif %}{% endfor %}
           </optgroup>
@@ -758,9 +761,9 @@
         </div>
       </div>
       <div>
-        <label class="block text-xs font-semibold text-smoke">Categoria (opcional)</label>
-        <select id="edit-fixo-category" name="category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
-          <option value="">Sem categoria</option>
+        <label class="block text-xs font-semibold text-smoke">Categoria</label>
+        <select id="edit-fixo-category" name="category" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="" disabled>Selecione…</option>
           <optgroup label="Entradas">
             {% for cat in categories %}{% if cat.type == "income" %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endif %}{% endfor %}
           </optgroup>
@@ -840,9 +843,9 @@
         </select>
       </div>
       <div>
-        <label class="block text-xs font-semibold text-smoke">Categoria (opcional)</label>
-        <select id="edit-tx-category" name="category" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
-          <option value="">Sem categoria</option>
+        <label class="block text-xs font-semibold text-smoke">Categoria</label>
+        <select id="edit-tx-category" name="category" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <option value="" disabled>Selecione…</option>
           {% for cat in categories %}
           <option value="{{ cat.id }}">{{ cat.name }}</option>
           {% endfor %}
