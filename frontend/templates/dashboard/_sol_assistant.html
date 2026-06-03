@@ -17,6 +17,16 @@ Sol — Assistente Virtual Solve
   border-radius: 8px;
   animation: sol-action-pulse 1.4s ease-in-out infinite !important;
 }
+@keyframes sol-cat-pulse {
+  0%, 100% { outline-color: rgba(0,201,122,0.9); }
+  50%       { outline-color: rgba(0,201,122,0.35); }
+}
+.sol-category-highlight {
+  outline: 2px solid #00C97A !important;
+  outline-offset: 8px !important;
+  border-radius: 10px;
+  animation: sol-cat-pulse 1.8s ease-in-out infinite !important;
+}
 </style>
 
 <!-- Estado do usuário injetado pelo context processor -->
@@ -33,9 +43,9 @@ const solState = {
 
 <div x-data="solTour()" x-init="init()" id="sol-assistant">
 
-  <!-- ── Overlay escuro (quando não há spotlight de elemento) ── -->
+  <!-- ── Overlay escuro (só quando não há spotlight nem ação pendente no mesmo passo) ── -->
   <div
-    x-show="active && !spotlight"
+    x-show="active && !spotlight && !spotlight2 && !actionClicked && !current().actionPending"
     x-transition:enter="transition-opacity duration-400"
     x-transition:enter-start="opacity-0"
     x-transition:enter-end="opacity-100"
@@ -46,7 +56,7 @@ const solState = {
     style="display:none; background:rgba(0,0,0,0.68); z-index:172;"
   ></div>
 
-  <!-- ── Spotlight (cria o "recorte" de luz sobre o elemento alvo) ── -->
+  <!-- ── Spotlight principal ── -->
   <template x-if="active && spotlight">
     <div
       class="fixed pointer-events-none"
@@ -60,9 +70,23 @@ const solState = {
     ></div>
   </template>
 
+  <!-- ── Spotlight secundário (para destaque de dois elementos simultâneos) ── -->
+  <template x-if="active && spotlight2">
+    <div
+      class="fixed pointer-events-none"
+      :style="`
+        top:${spotlight2.top}px; left:${spotlight2.left}px;
+        width:${spotlight2.width}px; height:${spotlight2.height}px;
+        box-shadow:0 0 0 9999px rgba(0,0,0,0.68);
+        border-radius:10px; z-index:172;
+        transition:top .3s ease, left .3s ease, width .3s ease, height .3s ease;
+      `"
+    ></div>
+  </template>
+
   <!-- ── Painel principal: avatar + balão ── -->
   <div
-    x-show="active"
+    x-show="active && !(current().addingMore && !spotlight)"
     x-transition:enter="transition-all duration-500 ease-out"
     x-transition:enter-start="opacity-0 translate-y-8"
     x-transition:enter-end="opacity-100 translate-y-0"
@@ -70,8 +94,8 @@ const solState = {
     x-transition:leave-start="opacity-100 translate-y-0"
     x-transition:leave-end="opacity-0 translate-y-8"
     class="fixed bottom-5 flex items-end gap-3"
-    :class="flip ? 'right-5 flex-row-reverse' : 'left-4 md:left-[246px]'"
-    style="display:none; z-index:200; max-width: min(calc(100vw - 1.5rem), 420px);"
+    :class="current().centered ? 'left-1/2 -translate-x-1/2' : flip ? 'right-5 flex-row-reverse' : 'left-4 md:left-[246px]'"
+    :style="`display:none; max-width:min(calc(100vw - 1.5rem), 420px); z-index:${actionClicked ? 40 : 200};`"
   >
 
     <!-- Sol — Avatar -->
@@ -88,42 +112,103 @@ const solState = {
       >
         <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;">
           <defs>
-            <radialGradient id="sol-face" cx="50%" cy="36%" r="62%">
-              <stop offset="0%" stop-color="#D9A07A"/>
-              <stop offset="100%" stop-color="#B5724A"/>
+            <radialGradient id="sol-skin" cx="42%" cy="28%" r="68%">
+              <stop offset="0%"   stop-color="#F2C090"/>
+              <stop offset="55%"  stop-color="#D9956A"/>
+              <stop offset="100%" stop-color="#B86E38"/>
             </radialGradient>
+            <radialGradient id="sol-iris-l" cx="36%" cy="30%" r="68%">
+              <stop offset="0%"   stop-color="#A0703A"/>
+              <stop offset="100%" stop-color="#3B1800"/>
+            </radialGradient>
+            <radialGradient id="sol-iris-r" cx="36%" cy="30%" r="68%">
+              <stop offset="0%"   stop-color="#A0703A"/>
+              <stop offset="100%" stop-color="#3B1800"/>
+            </radialGradient>
+            <linearGradient id="sol-hair" x1="25%" y1="0%" x2="75%" y2="100%">
+              <stop offset="0%"   stop-color="#2E1200"/>
+              <stop offset="50%"  stop-color="#1A0800"/>
+              <stop offset="100%" stop-color="#0D0300"/>
+            </linearGradient>
+            <linearGradient id="sol-cloth" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%"   stop-color="#065F46"/>
+              <stop offset="100%" stop-color="#022C22"/>
+            </linearGradient>
           </defs>
+          <!-- Background -->
           <circle cx="50" cy="50" r="50" fill="#0F172A"/>
-          <path d="M16 97 C22 80 34 73 50 71 C66 73 78 80 84 97 L100 102 L0 102Z" fill="#064E3B"/>
-          <path d="M44 73 L50 81 L56 73" fill="none" stroke="#00C97A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          <rect x="44" y="62" width="12" height="13" rx="5" fill="#D9A07A"/>
-          <ellipse cx="50" cy="52" rx="26" ry="27" fill="url(#sol-face)"/>
-          <path d="M24 48 Q23 24 43 17 Q50 13 57 17 Q77 24 76 48 Q68 29 50 28 Q32 29 24 48Z" fill="#1A1A30"/>
-          <path d="M24 48 Q20 58 24 67 Q21 55 26 46Z" fill="#1A1A30"/>
-          <path d="M76 48 Q80 58 76 67 Q79 55 74 46Z" fill="#1A1A30"/>
-          <path d="M59 17 Q78 26 76 46" stroke="#00C97A" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.80"/>
-          <path d="M25 50 Q27 42 25 36" stroke="#00C97A" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.40"/>
-          <path d="M31 41 Q37 38 42 40" stroke="#7B4832" stroke-width="2" fill="none" stroke-linecap="round"/>
-          <path d="M58 40 Q63 38 69 41" stroke="#7B4832" stroke-width="2" fill="none" stroke-linecap="round"/>
-          <rect x="29" y="44" width="18" height="12" rx="4.5" fill="none" stroke="#334155" stroke-width="1.8"/>
-          <rect x="53" y="44" width="18" height="12" rx="4.5" fill="none" stroke="#334155" stroke-width="1.8"/>
-          <path d="M47 50 L53 50" stroke="#334155" stroke-width="1.8" stroke-linecap="round"/>
-          <path d="M29 50 L25 49" stroke="#334155" stroke-width="1.8" stroke-linecap="round"/>
-          <path d="M71 50 L75 49" stroke="#334155" stroke-width="1.8" stroke-linecap="round"/>
-          <ellipse cx="38" cy="50" rx="4.5" ry="4" fill="#1E293B"/>
-          <ellipse cx="62" cy="50" rx="4.5" ry="4" fill="#1E293B"/>
-          <circle cx="36.5" cy="48.5" r="1.4" fill="white"/>
-          <circle cx="60.5" cy="48.5" r="1.4" fill="white"/>
-          <path d="M47 59 Q50 63 53 59" stroke="#A06040" stroke-width="1.3" fill="none" stroke-linecap="round"/>
-          <path d="M37 68 Q50 79 63 68" stroke="#A06040" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-          <ellipse cx="30" cy="63" rx="7" ry="4" fill="#E87060" opacity="0.26"/>
-          <ellipse cx="70" cy="63" rx="7" ry="4" fill="#E87060" opacity="0.26"/>
-          <path d="M80 26 L81.4 21.6 L82.8 26 L87.2 27.4 L82.8 28.8 L81.4 33.2 L80 28.8 L75.6 27.4Z" fill="#00C97A" opacity="0.92"/>
+          <!-- Clothing -->
+          <path d="M18 95 Q50 112 82 95 L88 106 L12 106Z" fill="url(#sol-cloth)"/>
+          <path d="M36 82 Q43 91 50 93 Q57 91 64 82 L67 91 Q57 101 50 102 Q43 101 33 91Z" fill="#047857"/>
+          <!-- Neck -->
+          <path d="M43 76 Q50 83 57 76 L57 84 Q50 89 43 84Z" fill="url(#sol-skin)"/>
+          <!-- Hair — back -->
+          <ellipse cx="50" cy="36" rx="27" ry="30" fill="url(#sol-hair)"/>
+          <path d="M23 44 Q17 65 21 84 Q28 95 37 87 Q27 75 26 53Z" fill="#130600"/>
+          <path d="M77 44 Q83 65 79 84 Q72 95 63 87 Q73 75 74 53Z" fill="#130600"/>
+          <!-- Face -->
+          <ellipse cx="50" cy="52" rx="25" ry="27" fill="url(#sol-skin)"/>
+          <!-- Face side shading -->
+          <ellipse cx="26" cy="54" rx="5" ry="16" fill="#9E5828" opacity="0.26"/>
+          <ellipse cx="74" cy="54" rx="5" ry="16" fill="#9E5828" opacity="0.26"/>
+          <!-- Forehead highlight -->
+          <ellipse cx="46" cy="36" rx="12" ry="7" fill="#FDDCB0" opacity="0.35"/>
+          <!-- Hair — front -->
+          <path d="M25 46 Q23 17 50 12 Q77 17 75 46 Q67 25 50 23 Q33 25 25 46Z" fill="url(#sol-hair)"/>
+          <!-- Hair sheen -->
+          <path d="M38 14 Q50 9 62 14 Q56 11 50 10 Q44 11 38 14Z" fill="#4E2200" opacity="0.55"/>
+          <!-- Green streak -->
+          <path d="M63 14 Q77 26 75 46" stroke="#00C97A" stroke-width="2.8" fill="none" stroke-linecap="round" opacity="0.90"/>
+          <!-- Sparkle -->
+          <path d="M81 23 L82.2 19.2 L83.4 23 L87.2 24.2 L83.4 25.4 L82.2 29.2 L81 25.4 L77.2 24.2Z" fill="#00C97A" opacity="0.94"/>
+          <!-- Eyebrows -->
+          <path d="M30 42 Q37 38.5 44 41" stroke="#1E0900" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+          <path d="M56 41 Q63 38.5 70 42" stroke="#1E0900" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+          <!-- Glasses -->
+          <rect x="28" y="45" width="19" height="13" rx="5" fill="rgba(180,225,255,0.06)" stroke="#2D3748" stroke-width="1.8"/>
+          <rect x="53" y="45" width="19" height="13" rx="5" fill="rgba(180,225,255,0.06)" stroke="#2D3748" stroke-width="1.8"/>
+          <path d="M47 51.5 L53 51.5" stroke="#2D3748" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M28 51.5 L23 51"   stroke="#2D3748" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M72 51.5 L77 51"   stroke="#2D3748" stroke-width="1.6" stroke-linecap="round"/>
+          <!-- Lens reflection -->
+          <path d="M31 47.5 Q34 46.5 38 48" stroke="white" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.38"/>
+          <path d="M56 47.5 Q59 46.5 63 48" stroke="white" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.38"/>
+          <!-- Left eye -->
+          <ellipse cx="37.5" cy="52"   rx="4.8" ry="3.8" fill="white"/>
+          <ellipse cx="37.5" cy="52"   rx="3.2" ry="3.2" fill="url(#sol-iris-l)"/>
+          <ellipse cx="37.5" cy="52"   rx="1.7" ry="1.7" fill="#090200"/>
+          <circle  cx="36.2" cy="50.6" r="1.1"            fill="white"/>
+          <circle  cx="39.4" cy="53.3" r="0.55"           fill="white" opacity="0.65"/>
+          <path d="M32.5 49.8 Q37.5 47.4 42.5 49.8" stroke="#1E0900" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+          <path d="M32.8 54.3 Q37.5 55.9 42.2 54.3" stroke="#B87040" stroke-width="0.7" fill="none" stroke-linecap="round" opacity="0.48"/>
+          <!-- Right eye -->
+          <ellipse cx="62.5" cy="52"   rx="4.8" ry="3.8" fill="white"/>
+          <ellipse cx="62.5" cy="52"   rx="3.2" ry="3.2" fill="url(#sol-iris-r)"/>
+          <ellipse cx="62.5" cy="52"   rx="1.7" ry="1.7" fill="#090200"/>
+          <circle  cx="61.2" cy="50.6" r="1.1"            fill="white"/>
+          <circle  cx="64.4" cy="53.3" r="0.55"           fill="white" opacity="0.65"/>
+          <path d="M57.5 49.8 Q62.5 47.4 67.5 49.8" stroke="#1E0900" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+          <path d="M57.8 54.3 Q62.5 55.9 67.2 54.3" stroke="#B87040" stroke-width="0.7" fill="none" stroke-linecap="round" opacity="0.48"/>
+          <!-- Nose -->
+          <path d="M47 61 Q50 66 53 61" stroke="#A05828" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+          <ellipse cx="47" cy="63.5" rx="1.8" ry="1.1" fill="#985220" opacity="0.40"/>
+          <ellipse cx="53" cy="63.5" rx="1.8" ry="1.1" fill="#985220" opacity="0.40"/>
+          <!-- Mouth -->
+          <path d="M42.5 68.5 Q46.5 66.5 50 68 Q53.5 66.5 57.5 68.5" stroke="#A05828" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+          <path d="M42.5 68.5 Q50 76.5 57.5 68.5" fill="#7A3818" opacity="0.72"/>
+          <ellipse cx="50" cy="71.5" rx="4.5" ry="1.8" fill="#E09060" opacity="0.38"/>
+          <path d="M44 69.5 Q50 73.5 56 69.5" fill="white" opacity="0.50"/>
+          <!-- Cheek blush -->
+          <ellipse cx="27" cy="61" rx="8" ry="5" fill="#E87060" opacity="0.17"/>
+          <ellipse cx="73" cy="61" rx="8" ry="5" fill="#E87060" opacity="0.17"/>
+          <!-- Green earrings -->
+          <circle cx="25" cy="55" r="2.2" fill="#00C97A" opacity="0.88"/>
+          <circle cx="75" cy="55" r="2.2" fill="#00C97A" opacity="0.88"/>
         </svg>
       </div>
       <div
         class="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-solve text-[10px] font-black text-white shadow-sm"
-        x-text="step + 1"
+        x-text="currentMajorDot + 1"
       ></div>
     </div>
 
@@ -141,12 +226,12 @@ const solState = {
         <!-- Dots de progresso + pular -->
         <div class="mb-3 flex items-center justify-between gap-2">
           <div class="flex items-center gap-[5px] flex-wrap">
-            <template x-for="(s, i) in steps" :key="i">
+            <template x-for="(idx, j) in majorStepIndices" :key="j">
               <div
                 class="rounded-full transition-all duration-300"
-                :style="i === step
+                :style="j === currentMajorDot
                   ? 'width:14px;height:6px;background:#00C97A;'
-                  : i < step
+                  : j < currentMajorDot
                     ? 'width:6px;height:6px;background:rgba(0,201,122,0.4);'
                     : 'width:6px;height:6px;background:#E2E8F0;'"
               ></div>
@@ -186,21 +271,86 @@ const solState = {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
             </svg>
           </button>
-          <button
-            @click="next()"
-            class="flex-1 rounded-xl py-2.5 text-sm font-black text-white transition-all hover:opacity-90 active:scale-[0.97]"
-            :class="current().celebrate ? 'bg-solve' : 'bg-obsidian'"
-            x-text="step === steps.length - 1
-              ? 'Começar agora! 🚀'
-              : current().nextLabel"
-          ></button>
+          <!-- Controle principal: muda conforme o estado do step -->
+          <div class="flex-1">
+
+            <!-- Aguardando ação obrigatória -->
+            <div
+              x-show="current().actionPending"
+              style="display:none;"
+              class="w-full rounded-xl border border-dashed border-slate-200 py-2.5 text-center text-xs font-medium text-slate-400"
+            >
+              Siga a orientação acima para continuar
+            </div>
+
+            <!-- Pergunta: tem mais contas? -->
+            <div
+              x-show="current().promptMore"
+              style="display:none;"
+              class="flex gap-2"
+            >
+              <button
+                @click="wantMore()"
+                class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-obsidian transition-colors hover:bg-slate-50"
+                x-text="current().promptYesLabel"
+              ></button>
+              <button
+                @click="doneAdding()"
+                class="flex-1 rounded-xl py-2.5 text-sm font-black text-white bg-solve transition-all hover:opacity-90 active:scale-[0.97]"
+                x-text="current().promptNoLabel"
+              ></button>
+            </div>
+
+            <!-- Modo "adicionando mais": spotlight ativo, botão para encerrar (só quando já concluído) -->
+            <button
+              x-show="current().addingMore && !current().actionPending"
+              style="display:none;"
+              @click="doneAdding()"
+              class="w-full rounded-xl py-2.5 text-sm font-black text-white bg-solve transition-all hover:opacity-90 active:scale-[0.97]"
+            >Já terminei</button>
+
+            <!-- Botão padrão: Próximo / Continuar -->
+            <button
+              x-show="!current().actionPending && !current().promptMore && !current().addingMore"
+              @click="next()"
+              class="w-full rounded-xl py-2.5 text-sm font-black text-white transition-all hover:opacity-90 active:scale-[0.97]"
+              :class="current().celebrate ? 'bg-solve' : 'bg-obsidian'"
+              x-text="step === steps.length - 1 ? 'Começar agora! 🚀' : current().nextLabel"
+            ></button>
+
+          </div>
         </div>
 
       </div>
     </div>
   </div>
 
-  <!-- ── Botão re-abrir tour (FAB canto inferior direito) ── -->
+  <!-- ── Botão compacto "Já terminei": aparece quando o modal está aberto no modo addingMore ── -->
+  <div
+    x-show="active && current().addingMore && !current().actionPending && !spotlight"
+    x-transition:enter="transition-all duration-300"
+    x-transition:enter-start="opacity-0 scale-75"
+    x-transition:enter-end="opacity-100 scale-100"
+    x-transition:leave="transition-all duration-200"
+    x-transition:leave-start="opacity-100 scale-100"
+    x-transition:leave-end="opacity-0 scale-75"
+    class="fixed bottom-5 flex flex-col items-end gap-1.5"
+    :class="flip ? 'left-4 md:left-[246px]' : 'right-5'"
+    style="display:none; z-index:60;"
+  >
+    <button
+      @click="doneAdding()"
+      class="flex items-center gap-2 rounded-full bg-solve px-4 py-2.5 text-sm font-black text-white shadow-xl shadow-solve/30 transition-all hover:scale-105 hover:opacity-90 active:scale-95"
+    >
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+      </svg>
+      Já terminei
+    </button>
+    <span class="rounded-full bg-obsidian/70 px-2 py-0.5 text-[10px] font-medium text-white/80 backdrop-blur-sm">Guia Sol</span>
+  </div>
+
+  <!-- ── Botão re-abrir tour (FAB direito — arrastável verticalmente) ── -->
   <div
     x-show="!active"
     x-transition:enter="transition-all duration-500 delay-700"
@@ -209,29 +359,89 @@ const solState = {
     x-transition:leave="transition-all duration-200"
     x-transition:leave-start="opacity-100 scale-100"
     x-transition:leave-end="opacity-0 scale-50"
-    class="fixed bottom-5 right-5 flex flex-col items-center gap-1.5"
-    style="display:none; z-index:30;"
+    class="fixed right-5 flex flex-col items-center gap-1.5 select-none"
+    style="display:none;"
+    :style="`z-index:30; bottom:${_fabBottom}px; cursor:${_fabDragging ? 'grabbing' : 'default'};`"
+    @mousedown.stop="startFabDrag($event)"
+    @touchstart.stop.prevent="startFabDrag($event)"
   >
     <button
-      @click="restart()"
+      @click="!_fabDragMoved && restart()"
+      :style="_fabDragging ? 'cursor:grabbing' : 'cursor:grab'"
       class="group relative flex h-14 w-14 items-center justify-center rounded-full bg-obsidian shadow-xl shadow-black/40 transition-all duration-200 hover:scale-110 hover:bg-slate-800 active:scale-95"
-      title="Abrir guia — Sol"
+      title="Abrir guia — Sol (arraste para reposicionar)"
     >
       <!-- Anel pulsante verde -->
       <span class="absolute inset-0 rounded-full bg-solve/20 animate-ping opacity-75 group-hover:opacity-0"></span>
       <!-- Avatar Sol -->
       <div class="relative h-11 w-11 overflow-hidden rounded-full">
         <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;">
+          <defs>
+            <radialGradient id="solf-skin" cx="42%" cy="28%" r="68%">
+              <stop offset="0%"   stop-color="#F2C090"/>
+              <stop offset="100%" stop-color="#B86E38"/>
+            </radialGradient>
+            <linearGradient id="solf-hair" x1="25%" y1="0%" x2="75%" y2="100%">
+              <stop offset="0%"   stop-color="#2E1200"/>
+              <stop offset="100%" stop-color="#0D0300"/>
+            </linearGradient>
+          </defs>
           <circle cx="50" cy="50" r="50" fill="#0F172A"/>
-          <ellipse cx="50" cy="56" rx="23" ry="24" fill="#D9A07A"/>
-          <path d="M27 50 Q26 27 44 20 Q50 15 56 20 Q74 27 73 50 Q65 32 50 31 Q35 32 27 50Z" fill="#1A1A30"/>
-          <path d="M57 20 Q75 28 73 48" stroke="#00C97A" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.82"/>
-          <ellipse cx="40" cy="52" rx="4.2" ry="3.8" fill="#1E293B"/>
-          <ellipse cx="60" cy="52" rx="4.2" ry="3.8" fill="#1E293B"/>
-          <circle cx="38.5" cy="50.5" r="1.2" fill="white"/>
-          <circle cx="58.5" cy="50.5" r="1.2" fill="white"/>
-          <path d="M39 66 Q50 74 61 66" stroke="#A06040" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-          <path d="M80 26 L81.2 22.2 L82.4 26 L86.2 27.2 L82.4 28.4 L81.2 32.2 L80 28.4 L76.2 27.2Z" fill="#00C97A" opacity="0.90"/>
+          <!-- Clothing -->
+          <path d="M20 93 Q50 110 80 93 L86 106 L14 106Z" fill="#065F46"/>
+          <path d="M37 82 Q50 92 63 82 L65 91 Q50 99 35 91Z" fill="#047857"/>
+          <!-- Neck -->
+          <path d="M43 77 Q50 84 57 77 L57 84 Q50 89 43 84Z" fill="url(#solf-skin)"/>
+          <!-- Hair back -->
+          <ellipse cx="50" cy="37" rx="26" ry="29" fill="url(#solf-hair)"/>
+          <path d="M24 46 Q18 66 22 84 Q29 95 37 87 Q27 75 26 54Z" fill="#130600"/>
+          <path d="M76 46 Q82 66 78 84 Q71 95 63 87 Q73 75 74 54Z" fill="#130600"/>
+          <!-- Face -->
+          <ellipse cx="50" cy="53" rx="24" ry="26" fill="url(#solf-skin)"/>
+          <ellipse cx="27" cy="54" rx="5"  ry="14" fill="#9E5828" opacity="0.24"/>
+          <ellipse cx="73" cy="54" rx="5"  ry="14" fill="#9E5828" opacity="0.24"/>
+          <ellipse cx="46" cy="37" rx="11" ry="7"  fill="#FDDCB0" opacity="0.33"/>
+          <!-- Hair front -->
+          <path d="M26 48 Q24 19 50 13 Q76 19 74 48 Q66 27 50 25 Q34 27 26 48Z" fill="url(#solf-hair)"/>
+          <!-- Green streak -->
+          <path d="M63 15 Q76 26 74 47" stroke="#00C97A" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.88"/>
+          <!-- Sparkle -->
+          <path d="M81 23 L82.1 19.6 L83.2 23 L86.6 24.1 L83.2 25.2 L82.1 28.6 L81 25.2 L77.6 24.1Z" fill="#00C97A" opacity="0.92"/>
+          <!-- Eyebrows -->
+          <path d="M31 43 Q37.5 39.5 44 42" stroke="#1E0900" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <path d="M56 42 Q62.5 39.5 69 43" stroke="#1E0900" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <!-- Glasses -->
+          <rect x="29" y="46" width="17" height="12" rx="4.5" fill="rgba(180,225,255,0.06)" stroke="#2D3748" stroke-width="1.8"/>
+          <rect x="54" y="46" width="17" height="12" rx="4.5" fill="rgba(180,225,255,0.06)" stroke="#2D3748" stroke-width="1.8"/>
+          <path d="M46 52 L54 52" stroke="#2D3748" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M29 52 L23 51" stroke="#2D3748" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M71 52 L77 51" stroke="#2D3748" stroke-width="1.6" stroke-linecap="round"/>
+          <!-- Left eye -->
+          <ellipse cx="37.5" cy="52"   rx="4.2" ry="3.3" fill="white"/>
+          <ellipse cx="37.5" cy="52"   rx="2.7" ry="2.7" fill="#8A5828"/>
+          <ellipse cx="37.5" cy="52"   rx="1.5" ry="1.5" fill="#090200"/>
+          <circle  cx="36.3" cy="50.8" r="1.0"            fill="white"/>
+          <!-- Right eye -->
+          <ellipse cx="62.5" cy="52"   rx="4.2" ry="3.3" fill="white"/>
+          <ellipse cx="62.5" cy="52"   rx="2.7" ry="2.7" fill="#8A5828"/>
+          <ellipse cx="62.5" cy="52"   rx="1.5" ry="1.5" fill="#090200"/>
+          <circle  cx="61.3" cy="50.8" r="1.0"            fill="white"/>
+          <!-- Eyelid lines -->
+          <path d="M33.2 49.8 Q37.5 47.6 41.8 49.8" stroke="#1E0900" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+          <path d="M58.2 49.8 Q62.5 47.6 66.8 49.8" stroke="#1E0900" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+          <!-- Nose -->
+          <ellipse cx="47" cy="62.5" rx="1.6" ry="1.0" fill="#985220" opacity="0.38"/>
+          <ellipse cx="53" cy="62.5" rx="1.6" ry="1.0" fill="#985220" opacity="0.38"/>
+          <!-- Smile -->
+          <path d="M42.5 68 Q50 76 57.5 68" fill="#7A3818" opacity="0.70"/>
+          <path d="M44 69  Q50 73 56 69"   fill="white"   opacity="0.48"/>
+          <path d="M42.5 68 Q50 74.5 57.5 68" stroke="#9A5228" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+          <!-- Cheeks -->
+          <ellipse cx="27" cy="61" rx="7" ry="5" fill="#E87060" opacity="0.17"/>
+          <ellipse cx="73" cy="61" rx="7" ry="5" fill="#E87060" opacity="0.17"/>
+          <!-- Earrings -->
+          <circle cx="26" cy="56" r="2.0" fill="#00C97A" opacity="0.87"/>
+          <circle cx="74" cy="56" r="2.0" fill="#00C97A" opacity="0.87"/>
         </svg>
       </div>
       <!-- Dot verde no canto -->
@@ -248,8 +458,59 @@ function solTour() {
     active: false,
     step: 0,
     spotlight: null,
+    spotlight2: null,
     flip: false,
+    actionClicked: false,
+    askingMore: null,
     _ringEl: null,
+    _actionEl: null,
+    _actionHandler: null,
+    _spotlightEl: null,
+    _spotlightEl2: null,
+    _drillRowEl: null,
+    _blockAutoScroll: false,
+    _catEls: [],
+
+    /* ── FAB drag ── */
+    _fabBottom:     parseInt(localStorage.getItem('sol_fab_bottom') || '20'),
+    _fabDragging:   false,
+    _fabDragMoved:  false,
+    _fabStartY:     0,
+    _fabStartBottom:0,
+
+    startFabDrag(e) {
+      this._fabDragging  = true;
+      this._fabDragMoved = false;
+      this._fabStartY      = e.touches ? e.touches[0].clientY : e.clientY;
+      this._fabStartBottom = this._fabBottom;
+      const self = this;
+
+      document.body.style.cursor    = 'grabbing';
+      document.body.style.userSelect = 'none';
+
+      function onMove(ev) {
+        ev.preventDefault();
+        const y     = ev.touches ? ev.touches[0].clientY : ev.clientY;
+        const delta = self._fabStartY - y;
+        if (Math.abs(delta) > 4) self._fabDragMoved = true;
+        self._fabBottom = Math.max(8, Math.min(window.innerHeight - 88, self._fabStartBottom + delta));
+      }
+      function onUp() {
+        self._fabDragging              = false;
+        document.body.style.cursor    = '';
+        document.body.style.userSelect = '';
+        localStorage.setItem('sol_fab_bottom', Math.round(self._fabBottom));
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup',   onUp);
+        window.removeEventListener('touchmove', onMove);
+        window.removeEventListener('touchend',  onUp);
+        setTimeout(function () { self._fabDragMoved = false; }, 120);
+      }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup',   onUp);
+      window.addEventListener('touchmove', onMove, { passive: false });
+      window.addEventListener('touchend',  onUp);
+    },
 
     /* ── Definição dos steps ───────────────────────────────────────── */
     steps: [
@@ -261,109 +522,266 @@ function solTour() {
       /* 1 – Contas: criar */
       {
         isDone: (s) => s.hasAccounts,
+        askMore: true,
         msgFn: (done) => done
-          ? `Ótimo! Você já tem contas cadastradas. Isso é o ponto de partida de tudo. 🏦`
+          ? `Ótimo! Você já tem contas cadastradas. Isso é o ponto de partida de tudo. 🏦<br><br>Você tem mais contas para adicionar?`
           : `O primeiro passo é criar suas <strong>contas</strong>. Banco, carteira, cartão ou custódia — quanto mais completo, mais preciso fica o diagnóstico.<br><br>👉 Clique em <strong>Nova conta</strong>.`,
+        msgFnMore: () => `Ótimo! Adicione suas outras contas quando quiser.<br><br>👉 Clique em <strong>Nova conta</strong>. Quando terminar, clique em <strong>Já terminei</strong>.`,
         targetFn: (path, done) => {
           if (done) return null;
-          return path.startsWith('/contas') ? '[data-tour-action="nova-conta"]' : '[data-tour="contas"]';
+          return path.startsWith('/dashboard/contas') ? '[data-tour-action="nova-conta"]' : '[data-tour="contas"]';
         },
         challenge: `5 contas cadastradas = Platina em 🏦 Primeira Conta.`,
         rewardFn: (done) => done ? `Contas cadastradas! Continue assim.` : null,
         rewardIconFn: (done) => done ? `🏦` : null,
       },
-      /* 2 – Saldo patrimonial */
+      /* 2 – Metas */
       {
-        isDone: (s) => s.hasSnapshots,
+        isDone: (s) => s.hasGoals,
+        keepVisible: true,
         msgFn: (done) => done
-          ? `Perfeito! Saldo patrimonial registrado. Agora o Solve consegue medir o crescimento do seu patrimônio mês a mês. 📸`
-          : `Agora registre o <strong>saldo patrimonial</strong> de cada conta. É o valor total que você tem — não só o que entrou esse mês.<br><br>👉 Clique em <strong>Atualizar patrimônio</strong>.`,
+          ? `Excelente! Você já tem metas definidas. Ter um objetivo muda tudo na hora de poupar. 🎯`
+          : `Defina uma <strong>meta</strong>. Reserva de emergência, viagem, carro — qualquer objetivo. O Solve acompanha mês a mês se você está no ritmo.<br><br>👉 Clique em <strong>Nova meta</strong>, preencha e salve.`,
         targetFn: (path, done) => {
           if (done) return null;
-          return path.startsWith('/contas') ? '[data-tour-action="registrar-saldo"]' : '[data-tour="contas"]';
+          return path.startsWith('/dashboard/metas') ? '[data-tour-action="nova-meta"]' : '[data-tour="metas"]';
+        },
+        challenge: `Concluir 5 metas = Platina em 🏆 Meta Conquistada.`,
+        rewardFn: (done) => done ? `Metas criadas! O Solve vai te avisar quando sair do ritmo.` : null,
+        rewardIconFn: (done) => done ? `🎯` : null,
+      },
+      /* 2b – Metas: explorar drill-down */
+      {
+        substep: true,
+        isDone: () => false,
+        msgFn: () => `🎯 <strong>Acompanhe cada meta de perto</strong><br><br>Clique em qualquer <strong>card de meta</strong> para ver o histórico de aportes vinculados a ela, o progresso real e os lançamentos registrados.<br><br>👆 Experimente clicar no card ao lado.`,
+        targetFn: (path) => {
+          if (!path.startsWith('/dashboard/metas')) return '[data-tour="metas"]';
+          return '[data-tour-action="meta-box"]';
+        },
+      },
+      /* 3 – Saldo patrimonial */
+      {
+        isDone: (s) => s.hasSnapshots,
+        autoAdvanceIfDone: true,
+        msgFn: (done) => done
+          ? `Perfeito! Todas as contas têm 2 meses de saldo registrado. O Solve já consegue medir a variação do seu patrimônio! 📸`
+          : `Registre o <strong>saldo patrimonial</strong> de <strong>cada conta em pelo menos 2 meses</strong> diferentes.<br><br>💡 Use o mês atual e um anterior que você conheça — isso permite ao Solve calcular a <strong>variação do patrimônio</strong> ao longo do tempo. Use as <strong>mesmas datas</strong> em todas as contas.<br><br>👉 Clique em <strong>Atualizar patrimônio</strong> em cada conta.`,
+        targetFn: (path, done) => {
+          if (done) return null;
+          return path.startsWith('/dashboard/contas') ? '[data-tour-action="registrar-saldo"]' : '[data-tour="contas"]';
         },
         rewardFn: (done) => done
           ? `Saldo registrado! Hábito que vale pontos todo mês em 📸 Saldo Registrado.`
           : `Manter o saldo atualizado gera pontos mensais em 📸 Saldo Registrado!`,
         rewardIconFn: () => `📸`,
       },
-      /* 3 – Lançamentos */
+      /* 3 – Categorias: Saídas */
       {
-        isDone: (s) => s.hasTransactions,
+        urlDone: () => window.location.pathname.startsWith('/dashboard/lancamentos') && window.location.search.includes('tab=categorias'),
         msgFn: (done) => done
-          ? `Muito bem! Você já tem lançamentos registrados. Cada um torna o diagnóstico mais preciso. ✏️`
-          : `Agora os <strong>lançamentos</strong>. Cada gasto e receita que você registrar é mais uma peça do quebra-cabeça das suas finanças.<br><br>👉 Use <strong>+ Receita</strong> ou <strong>+ Gasto</strong>.`,
+          ? `Você está nas Categorias! Veja as de <strong>Saídas</strong> — gastos como Alimentação, Transporte, Lazer. O Solve já tem um conjunto padrão; personalize conforme seu perfil.`
+          : window.location.pathname.startsWith('/dashboard/lancamentos')
+            ? `Agora abra a aba <strong>Categorias</strong> para ver e personalizar seus grupos de gasto e receita.<br><br>👉 Clique na aba <strong>Categorias</strong>.`
+            : `Antes de lançar, vamos ver as <strong>categorias</strong>. Elas organizam seus gastos e são a base do Diagnóstico.<br><br>👉 Clique em <strong>Lançamentos</strong> no menu.`,
+        targetFn: (path) => {
+          if (!path.startsWith('/dashboard/lancamentos')) return '[data-tour="lancamentos"]';
+          if (!window.location.search.includes('tab=categorias')) return '[data-tour-action="aba-categorias"]';
+          return '[data-tour-categories="saida"]';
+        },
+      },
+      /* 4 – Categorias: Entradas */
+      {
+        urlDone: () => window.location.pathname.startsWith('/dashboard/lancamentos') && window.location.search.includes('tab=categorias'),
+        msgFn: (done) => done
+          ? `Agora veja as de <strong>Entradas</strong> — Salário, Freelance, Rendimentos. Organize suas fontes de receita. Quando estiver pronto, avançamos para os fixos.`
+          : `👉 Clique em <strong>Lançamentos</strong> e depois na aba <strong>Categorias</strong>.`,
+        targetFn: (path) => {
+          if (!path.startsWith('/dashboard/lancamentos')) return '[data-tour="lancamentos"]';
+          if (!window.location.search.includes('tab=categorias')) return '[data-tour-action="aba-categorias"]';
+          return '[data-tour-categories="entrada"]';
+        },
+      },
+      /* 5 – Fixos */
+      {
+        isDone: (s) => s.hasRecurring,
+        askMore: true,
+        msgFn: (done) => done
+          ? `Fixos cadastrados! Os fixos são o <strong>coração da projeção</strong> — quanto mais completa a lista, mais fiel o fluxo de caixa futuro. Você tem mais para adicionar?`
+          : `⭐ Os <strong>fixos</strong> são o passo mais importante do setup. Salário, aluguel, assinaturas, planos — tudo que se repete todo mês.<br><br>O Solve usa isso para <strong>projetar automaticamente</strong> os meses seguintes e calcular seu fluxo de caixa real.<br><br>👉 Clique na aba <strong>Fixos</strong>.`,
+        msgFnMore: () => `Ótimo! Adicione mais fixos: boletos, assinaturas, mensalidades, qualquer valor que se repita.<br><br>👉 Clique em <strong>Novo fixo</strong>. Quando terminar, clique em <strong>Já terminei</strong>.`,
         targetFn: (path, done) => {
           if (done) return null;
-          return path.startsWith('/lancamentos') ? '[data-tour-action="novo-lancamento"]' : '[data-tour="lancamentos"]';
+          if (!path.startsWith('/dashboard/lancamentos')) return '[data-tour="lancamentos"]';
+          const onFixos = window.location.search.includes('tab=fixos');
+          return onFixos ? '[data-tour-action="novo-fixo"]' : '[data-tour-action="aba-fixos"]';
+        },
+        challenge: `8 fixos ativos = Platina em 🔁 Fixos no Controle.`,
+        rewardFn: (done) => done ? `Fixos configurados! Projeção automática ativada. 🔁` : null,
+        rewardIconFn: (done) => done ? `🔁` : null,
+      },
+      /* 6 – Lançamentos variáveis */
+      {
+        isDone: (s) => s.hasTransactions,
+        askMore: true,
+        msgFn: (done) => done
+          ? `Lançamentos registrados! Quanto mais você registrar, mais rico fica o Diagnóstico. Use os filtros <strong>Mês / Ano / 12m</strong> para ver seu histórico de qualquer período. Tem mais receitas ou gastos para lançar agora?`
+          : `Agora as <strong>entradas e saídas variáveis</strong> — compras do mês, receitas extras, qualquer movimentação que não se repete todo mês.<br><br>💡 Inclua lançamentos de meses anteriores — use <strong>+ Receita</strong> ou <strong>+ Gasto</strong>, informe a data real de cada lançamento e ele aparecerá no mês correto.<br><br>👉 Use <strong>+ Receita</strong> ou <strong>+ Gasto</strong>.`,
+        msgFnMore: () => `Continue adicionando! Cada lançamento deixa o Diagnóstico mais preciso.<br><br>👉 Use <strong>+ Receita</strong> ou <strong>+ Gasto</strong>. Quando terminar, clique em <strong>Já terminei</strong>.`,
+        targetFn: (path, done) => {
+          if (done) return null;
+          return path.startsWith('/dashboard/lancamentos') ? '[data-tour-action="lancamentos-actions"]' : '[data-tour="lancamentos"]';
         },
         challenge: `50 lançamentos = nível Prata em ✏️ Primeiro Lançamento.`,
         rewardFn: (done) => done ? `Lançamentos registrados! O diagnóstico já ficou mais rico.` : null,
         rewardIconFn: (done) => done ? `✏️` : null,
       },
-      /* 4 – Fixos */
+      /* 6a – Diagnóstico: navegar */
       {
-        isDone: (s) => s.hasRecurring,
+        pathDone: '/dashboard/diagnostico',
         msgFn: (done) => done
-          ? `Ótimo! Fixos configurados. Agora o Solve já consegue projetar seu fluxo de caixa nos próximos meses. 🔁`
-          : `Ainda em Lançamentos, vá na aba <strong>Fixos</strong>. Salário, aluguel, assinaturas — tudo que se repete. O Solve projeta automaticamente nos meses seguintes.<br><br>👉 Clique na aba <strong>Fixos</strong>.`,
-        targetFn: (path, done) => {
-          if (done) return null;
-          if (!path.startsWith('/lancamentos')) return '[data-tour="lancamentos"]';
-          const onFixos = window.location.search.includes('tab=fixos');
-          return onFixos ? '[data-tour-action="novo-fixo"]' : '[data-tour-action="aba-fixos"]';
-        },
-        challenge: `8 fixos ativos = Platina em 🔁 Fixos no Controle.`,
-        rewardFn: (done) => done ? `Fixos configurados! Projeção automática a partir de agora.` : null,
-        rewardIconFn: (done) => done ? `🔁` : null,
+          ? `Você está no Diagnóstico! 🔍 Vou te mostrar o que cada bloco significa — clique em <strong>Próximo</strong> para a gente explorar juntos.`
+          : `O <strong>Diagnóstico</strong> é o raio-X das suas finanças. Vou te explicar cada bloco em detalhes.<br><br>👉 Clique em <strong>Diagnóstico</strong> no menu.`,
+        targetFn: (path, done) => done ? null : '[data-tour="diagnostico"]',
       },
-      /* 5 – Diagnóstico (informacional) */
+      /* 6b – Diagnóstico: Fluxo do Mês */
       {
-        msgFn: () => `Com os dados lançados, o <strong>Diagnóstico</strong> te mostra exatamente onde vai cada real: por categoria, fixo vs variável, e sua taxa de poupança mensal.`,
-        targetFn: () => '[data-tour="diagnostico"]',
+        substep: true,
+        msgFn: () => `📊 <strong>Fluxo do Mês — Fixo vs Variável</strong><br><br>Mostra a <em>composição</em> das suas receitas e despesas. A parte verde é o que é <strong>fixo</strong> (garantido), a cinza é o que é <strong>variável</strong> (pode mudar).<br><br>Quanto maior a barra verde nas receitas, mais previsível é sua renda.`,
+        targetFn: (path) => path.startsWith('/dashboard/diagnostico') ? '[data-tour-section="fluxo"]' : '[data-tour="diagnostico"]',
       },
-      /* 6 – Projeção (informacional) */
+      /* 6c – Diagnóstico: Fixos comprometidos */
       {
-        msgFn: () => `A <strong>Projeção</strong> olha para a frente. Com base nos seus fixos e histórico, você antecipa meses complicados <em>antes</em> que aconteçam.`,
-        targetFn: () => '[data-tour="projecao"]',
+        substep: true,
+        msgFn: () => `🔁 <strong>Despesas e Receitas Fixas</strong><br><br>Lista tudo que é <strong>recorrente</strong> todo mês — aluguel, salário, assinaturas.<br><br>É aqui que você vê o seu <strong>comprometimento obrigatório</strong>: o quanto já está "ocupado" antes mesmo de gastar qualquer coisa variável.`,
+        targetFn: (path) => path.startsWith('/dashboard/diagnostico') ? '[data-tour-section="fixos"]' : '[data-tour="diagnostico"]',
       },
-      /* 7 – Metas */
+      /* 6d – Diagnóstico: Por Categoria */
       {
-        isDone: (s) => s.hasGoals,
+        substep: true,
+        msgFn: () => `🏷️ <strong>Receitas e Gastos por Categoria</strong><br><br>Os gráficos mostram <em>para onde</em> o dinheiro vai e <em>de onde</em> vem — agrupado por categoria (Alimentação, Transporte, Salário…).<br><br>Se uma fatia está grande demais, pode ser hora de rever aquele gasto.`,
+        targetFn: (path) => path.startsWith('/dashboard/diagnostico') ? '[data-tour-section="categorias"]' : '[data-tour="diagnostico"]',
+      },
+      /* 6e – Diagnóstico: Composição do Patrimônio */
+      {
+        substep: true,
+        msgFn: () => `🏠 <strong>Composição do Patrimônio</strong><br><br>Exibe a divisão do seu patrimônio total entre <strong>caixa</strong> (contas bancárias) e <strong>investimentos</strong>.<br><br>Uma boa saúde financeira tem um equilíbrio entre liquidez imediata e rentabilidade a longo prazo.`,
+        targetFn: (path) => path.startsWith('/dashboard/diagnostico') ? '[data-tour-section="patrimonio"]' : '[data-tour="diagnostico"]',
+      },
+      /* 7a – Projeção: navegar */
+      {
+        pathDone: '/dashboard/projecao',
         msgFn: (done) => done
-          ? `Excelente! Você já tem metas definidas. Ter um objetivo muda tudo na hora de poupar. 🎯`
-          : `Defina uma <strong>meta</strong>. Reserva de emergência, viagem, carro — qualquer objetivo. O Solve acompanha mês a mês se você está no ritmo.<br><br>👉 Clique em <strong>Nova meta</strong>.`,
-        targetFn: (path, done) => {
-          if (done) return null;
-          return path.startsWith('/metas') ? '[data-tour-action="nova-meta"]' : '[data-tour="metas"]';
-        },
-        challenge: `Concluir 5 metas = Platina em 🏆 Meta Conquistada.`,
-        rewardFn: (done) => done ? `Metas criadas! O Solve vai te avisar quando sair do ritmo.` : null,
-        rewardIconFn: (done) => done ? `🎯` : null,
+          ? `Você está na Projeção! 📅 Aqui o Solve mostra seu fluxo de caixa mês a mês — passado real e futuro estimado. Clique em <strong>Próximo</strong> para explorarmos juntos.`
+          : `A <strong>Projeção</strong> olha para a frente. Com base nos seus fixos e histórico, você antecipa meses complicados <em>antes</em> que aconteçam.<br><br>👉 Clique em <strong>Projeção</strong> no menu.`,
+        targetFn: (path, done) => done ? null : '[data-tour="projecao"]',
       },
-      /* 8 – Investimentos */
+      /* 7b – Projeção: linha do mês atual + batimento */
+      {
+        substep: true,
+        msgFn: () => {
+          const hasBatimento = !!document.querySelector('[data-tour-section="batimento"]');
+          if (hasBatimento) {
+            return `⚠️ <strong>Divergência de batimento detectada!</strong><br><br>O <strong>saldo registrado</strong> em uma ou mais contas não fecha com a soma dos lançamentos daquele mês.<br><br>Isso acontece quando há uma entrada ou saída que você não registrou. Os botões mostram exatamente o ajuste necessário para fechar o mês — lance movimentações faltantes ou clique neles para corrigir.`;
+          }
+          return `📅 <strong>Mês atual em destaque</strong><br><br>A linha em preto é o mês corrente — entradas e saídas fixas e variáveis, resultado líquido e saldo final.<br><br>👆 <strong>Clique na linha</strong> para expandir e ver o detalhamento por custódia: cada conta com seus lançamentos, saldo de abertura e saldo final calculado.`;
+        },
+        targetFn: (path) => {
+          if (!path.startsWith('/dashboard/projecao')) return '[data-tour="projecao"]';
+          return document.querySelector('[data-tour-section="batimento"]')
+            ? '[data-tour-section="batimento"]'
+            : '[data-tour-section="current-month-row"]';
+        },
+      },
+      /* 7c – Projeção: obriga ir para o gráfico (sem Próximo — avança ao navegar) */
+      {
+        substep: true,
+        urlDone: () => window.location.pathname.startsWith('/dashboard/projecao') && window.location.search.includes('view=chart'),
+        autoAdvanceIfDone: true,
+        msgFn: () => `📈 <strong>Projeção gráfica</strong><br><br>Alterne para <strong>Gráfico</strong> no canto superior direito para visualizar o fluxo de caixa em barras e linha.<br><br>👆 Clique em <strong>Gráfico</strong> para continuar.`,
+        targetFn: (path) => {
+          if (!path.startsWith('/dashboard/projecao')) return '[data-tour="projecao"]';
+          return '[data-tour-action="ir-para-grafico"]';
+        },
+      },
+      /* 7d – Projeção: explorar o gráfico */
+      {
+        substep: true,
+        msgFn: () => `📊 <strong>Leia o gráfico em segundos</strong><br><br>Barras <span class="text-solve font-semibold">verdes</span> = resultado positivo do caixa · barras <span class="text-red-500 font-semibold">vermelhas</span> = negativo.<br><br>A <strong>linha cinza</strong> é o saldo acumulado — quando sobe, seu patrimônio cresce; quando cai, está encolhendo.<br><br>Barras claras = <em>projeção futura</em>.<br>Meses sólidos = realizado.`,
+        targetFn: (path) => {
+          if (!path.startsWith('/dashboard/projecao')) return '[data-tour="projecao"]';
+          return '[data-tour-section="projecao-chart"]';
+        },
+      },
+      /* 9a – Investimentos: navegar */
+      {
+        pathDone: '/dashboard/investimentos',
+        msgFn: (done) => done
+          ? `Você está em Investimentos! 💼 Aqui ficam seus ativos consolidados por custódia — caixa + portfólio. Clique em <strong>Próximo</strong> para continuar.`
+          : `Vamos ver seus <strong>investimentos</strong>. O Solve consolida todos os ativos por custódia e mostra a composição completa do seu patrimônio.<br><br>👉 Clique em <strong>Investimentos</strong> no menu.`,
+        targetFn: (path, done) => done ? null : '[data-tour="investimentos"]',
+      },
+      /* 9 – Investimentos: conectar */
       {
         isDone: (s) => s.hasInvestments,
+        askFirstIfUndone: true,
+        askMore: true,
+        watchModal: 'modal-boleta',
+        promptYesLabel: 'Sim, possuo',
+        promptNoLabel: 'Não por enquanto',
+        askMoreYesLabel: 'Sim, adicionar mais',
+        askMoreNoLabel: 'Não, já foram todos',
         msgFn: (done) => done
           ? `Incrível! Investimentos conectados. O patrimônio completo está no radar. 💼`
-          : `Se você investe — ou quer começar —, conecte seus <strong>investimentos</strong>. O Solve consolida tudo e mostra a composição completa do seu patrimônio.`,
+          : `Você possui algum <strong>investimento</strong> em alguma conta cadastrada?<br><br>Ações, FIIs, renda fixa, cripto — qualquer ativo que você queira acompanhar.`,
+        msgFnPromptDone: () => `Ativo registrado! 💼 Você tem <strong>mais investimentos</strong> para adicionar?`,
+        msgFnMore: () => `Ótimo! Use a <strong>Boleta</strong> para registrar seu próximo ativo — informe o ativo, a conta custódia e o valor investido.<br><br>👉 Clique em <strong>Boleta</strong>.`,
         targetFn: (path, done) => {
           if (done) return null;
-          return path.startsWith('/investimentos') ? '[data-tour-action="novo-investimento"]' : '[data-tour="investimentos"]';
+          return path.startsWith('/dashboard/investimentos') ? '[data-tour-action="novo-investimento"]' : '[data-tour="investimentos"]';
         },
         challenge: `10 investimentos = Platina em 💼 Investidor.`,
         rewardFn: (done) => done ? `Investimentos conectados! Patrimônio completo no painel.` : null,
         rewardIconFn: (done) => done ? `💼` : null,
       },
-      /* 9 – Score + Conquistas */
+      /* 9b – Investimentos: hero patrimônio */
       {
-        msgFn: () => `Quanto mais você usa, mais o seu <strong>Score de Saúde</strong> cresce. Cada hábito financeiro consistente desbloqueia conquistas e gera pontos.<br><br>Veja tudo aqui na <strong>Visão Geral</strong>.`,
-        targetFn: () => '[data-tour="dashboard"]',
+        substep: true,
+        msgFn: () => `🏦 <strong>Patrimônio Total</strong><br><br>O número grande no topo é seu patrimônio consolidado — <strong>caixa + investimentos</strong> de todas as contas.<br><br>Abaixo dele você vê a divisão: quanto está <em>disponível</em> (líquido) e quanto está <em>alocado</em> em ativos.`,
+        targetFn: (path) => path.startsWith('/dashboard/investimentos') ? '[data-tour-section="inv-patrimonio"]' : '[data-tour="investimentos"]',
+      },
+      /* 9c – Investimentos: caixa + por classe */
+      {
+        substep: true,
+        msgFn: () => `📊 <strong>Caixa e Por Classe de Ativo</strong><br><br><strong>Caixa</strong> mostra o saldo disponível em cada conta bancária — o dinheiro que você pode usar agora.<br><br><strong>Por classe</strong> distribui seus ativos por tipo (Ações, FIIs, Renda Fixa…) para você ver de onde vem cada parte do portfólio.`,
+        targetFn: (path) => {
+          if (!path.startsWith('/dashboard/investimentos')) return '[data-tour="investimentos"]';
+          return '[data-tour-section="inv-caixa"]';
+        },
+      },
+      /* 9d – Investimentos: ativos por custódia */
+      {
+        substep: true,
+        centered: true,
+        msgFn: () => `📋 <strong>Ativos por Custódia</strong><br><br>Cada grupo reúne os ativos de uma mesma conta custódia — útil quando você tem corretoras diferentes.<br><br>Para cada ativo você vê o <strong>valor atual</strong>, o <strong>ganho/perda</strong> e pode lançar rendimentos, dividendos ou vendas direto pelo ícone ao passar o mouse.`,
+        targetFn: (path) => path.startsWith('/dashboard/investimentos') ? '[data-tour-section="inv-ativos"]' : '[data-tour="investimentos"]',
+      },
+      /* 10 – Score + Conquistas */
+      {
+        autoNavigate: '/dashboard/',
+        urlDone: () => { const p = window.location.pathname.replace(/\/$/, ''); return p === '/dashboard' || p === ''; },
+        msgFn: (done) => done
+          ? `Você está na Visão Geral! 🏅 Aqui fica o seu Score de Saúde e todas as conquistas desbloqueadas. Quanto mais você usa, mais cresce.`
+          : `Quanto mais você usa, mais o seu <strong>Score de Saúde</strong> cresce. Cada hábito financeiro consistente desbloqueia conquistas e gera pontos.<br><br>👉 Clique em <strong>Visão Geral</strong> no menu.`,
+        targetFn: (path, done) => {
+          if (!path.startsWith('/dashboard')) return '[data-tour="dashboard"]';
+          return done ? '[data-tour-section="health-score"]' : '[data-tour="dashboard"]';
+        },
         reward: `Parabéns por explorar o Solve! Você já está na frente. 🏅`,
         rewardIcon: `🏅`,
         celebrate: true,
       },
-      /* 10 – Encerramento */
+      /* 11 – Encerramento */
       {
         msgFn: () => `Pronto! <strong>Agora você sabe para onde vai o seu dinheiro.</strong><br><br>Clique no botão <em>Guia Sol</em> aqui embaixo sempre que quiser rever o tour. Boa jornada! 🚀`,
         celebrate: true,
@@ -371,27 +789,90 @@ function solTour() {
       },
     ],
 
+    /* Índices dos steps principais (sem substep) para renderizar os dots */
+    get majorStepIndices() {
+      return this.steps.map((s, i) => i).filter(i => !this.steps[i].substep);
+    },
+    /* Posição do dot ativo: último índice major ≤ step atual */
+    get currentMajorDot() {
+      const m = this.majorStepIndices;
+      let pos = 0;
+      for (let j = 0; j < m.length; j++) {
+        if (m[j] <= this.step) pos = j; else break;
+      }
+      return pos;
+    },
+
+    /* Retorna true se o step está concluído — por solState, pathname ou URL custom */
+    _stepDone(s) {
+      if (s.urlDone)  return s.urlDone();
+      if (s.pathDone) return window.location.pathname.startsWith(s.pathDone);
+      return s.isDone ? s.isDone(solState) : false;
+    },
+
     /* ── current(): computa o conteúdo do step atual ── */
     current() {
       const s = this.steps[this.step] || this.steps[0];
-      const done = s.isDone ? s.isDone(solState) : false;
-      const msg     = s.msgFn     ? s.msgFn(done)     : '';
-      const reward  = s.rewardFn  ? s.rewardFn(done)  : (s.reward  || null);
+      const done = this._stepDone(s);
+      /* sub-estados do askMore (done=true) e askFirstIfUndone (done=false) */
+      const promptMore  = (!!s.askMore && done || !!s.askFirstIfUndone && !done) && this.askingMore === null;
+      const addingMore  = (!!s.askMore && done || !!s.askFirstIfUndone && !done) && this.askingMore === true;
+      /* Fase do prompt: before (askFirstIfUndone, done=false) vs after (askMore, done=true) */
+      const isAskFirstPhase = !!s.askFirstIfUndone && !done;
+      /* mensagem: usa msgFnMore no modo addingMore; msgFnPromptDone no prompt pós-inserção */
+      const msg        = (addingMore && s.msgFnMore) ? s.msgFnMore()
+                       : (promptMore && done && s.msgFnPromptDone) ? s.msgFnPromptDone()
+                       : s.msgFn ? s.msgFn(done) : '';
+      const reward     = (promptMore || addingMore) ? null
+                       : s.rewardFn ? s.rewardFn(done) : (s.reward || null);
       const rewardIcon = s.rewardIconFn ? s.rewardIconFn(done) : (s.rewardIcon || '🎉');
       const challenge  = done ? null : (s.challenge || null);
       const celebrate  = done || !!s.celebrate;
       const nextLabel  = s.nextLabel || (done ? 'Continuar →' : 'Próximo →');
-      return { msg, reward, rewardIcon, challenge, celebrate, nextLabel, done };
+      /* Labels diferenciados: before (askFirst) vs after (askMore) */
+      const promptYesLabel = isAskFirstPhase
+        ? (s.promptYesLabel    || 'Sim, tenho mais')
+        : (s.askMoreYesLabel   || s.promptYesLabel || 'Sim, tenho mais');
+      const promptNoLabel  = isAskFirstPhase
+        ? (s.promptNoLabel     || 'Não, continuar')
+        : (s.askMoreNoLabel    || s.promptNoLabel  || 'Não, continuar');
+      /* actionPending: ação obrigatória não concluída (não aplica nos sub-estados askMore/promptMore).
+         askFirstIfUndone com addingMore=true e done=false: força pending até isDone ser satisfeito. */
+      const actionPending = (!done && (!!s.isDone || !!s.pathDone || !!s.urlDone) && !this.actionClicked && !promptMore)
+                         || (!!s.askFirstIfUndone && addingMore && !done);
+      const centered = !!s.centered;
+      return { msg, reward, rewardIcon, challenge, celebrate, nextLabel, done,
+               actionPending, promptMore, addingMore, promptYesLabel, promptNoLabel, centered };
     },
 
     /* ── Ciclo de vida ── */
     init() {
       const self = this;
+      window._solTourInstance = self; /* expõe instância para targetFn de steps especiais */
       window.addEventListener('resize', function () {
         if (self.active) self.updateSpotlight();
       });
+      /* Reposiciona o spotlight a cada scroll sem refazer toda a lógica.
+         Usa capture:true para capturar scroll de qualquer container scrollável da página. */
+      let _raf = false;
+      document.addEventListener('scroll', function () {
+        if (!self.active || !self._spotlightEl) return;
+        if (!_raf) {
+          _raf = true;
+          requestAnimationFrame(function () {
+            self._refreshSpotlightPos();
+            _raf = false;
+          });
+        }
+      }, { passive: true, capture: true });
       const savedStep = localStorage.getItem('solve_tour_step');
       if (savedStep !== null) this.step = parseInt(savedStep) || 0;
+      /* Auto-advance steps that navigated away and returned already done (e.g. chart view) */
+      const _s = this.steps[this.step];
+      if (_s && _s.autoAdvanceIfDone && this._stepDone(_s)) {
+        this.step = Math.min(this.step + 1, this.steps.length - 1);
+        localStorage.setItem('solve_tour_step', this.step);
+      }
       if (!localStorage.getItem('solve_tour_v1')) {
         setTimeout(function () {
           self.active = true;
@@ -401,9 +882,30 @@ function solTour() {
     },
 
     next() {
+      this._clearActionWatch();
       if (this.step < this.steps.length - 1) {
         this.step++;
+        this.actionClicked = false;
+        this.askingMore    = null;
         localStorage.setItem('solve_tour_step', this.step);
+        /* Pula steps com autoAdvanceIfDone que já estão concluídos */
+        while (this.step < this.steps.length - 1) {
+          const _cur = this.steps[this.step];
+          if (_cur && _cur.autoAdvanceIfDone && this._stepDone(_cur)) {
+            this.step++;
+            localStorage.setItem('solve_tour_step', this.step);
+          } else { break; }
+        }
+        /* Se o novo step define autoNavigate e não estamos exatamente nessa página, redireciona */
+        const _ns = this.steps[this.step];
+        if (_ns && _ns.autoNavigate) {
+          const _cur = window.location.pathname.replace(/\/$/, '');
+          const _nav = _ns.autoNavigate.replace(/\/$/, '');
+          if (_cur !== _nav) {
+            window.location.href = _ns.autoNavigate;
+            return;
+          }
+        }
         const self = this;
         this.$nextTick(function () { self.updateSpotlight(); });
       } else {
@@ -412,31 +914,204 @@ function solTour() {
     },
 
     prev() {
+      this._clearActionWatch();
       if (this.step > 0) {
         this.step--;
+        this.actionClicked = false;
+        this.askingMore    = null;
         localStorage.setItem('solve_tour_step', this.step);
         const self = this;
         this.$nextTick(function () { self.updateSpotlight(); });
       }
     },
 
-    skip()   { this.finish(); },
+    /* Usuário quer adicionar mais contas */
+    wantMore() {
+      this.askingMore    = true;
+      this.actionClicked = false;
+      const self = this;
+      this.$nextTick(function () { self.updateSpotlight(); });
+    },
+
+    /* Usuário terminou de adicionar → avança */
+    doneAdding() {
+      this.askingMore = null;
+      this.next();
+    },
+
+    skip()   { this._clearActionWatch(); this.finish(); },
 
     finish() {
+      this._clearActionWatch();
       localStorage.setItem('solve_tour_v1', 'done');
       localStorage.removeItem('solve_tour_step');
       this._clearRing();
-      this.active    = false;
-      this.spotlight = null;
+      this._clearCategoryHighlight();
+      this.active            = false;
+      this.spotlight         = null;
+      this.spotlight2        = null;
+      this.actionClicked    = false;
+      this.askingMore       = null;
+      this._spotlightEl     = null;
+      this._spotlightEl2    = null;
+      this._drillRowEl      = null;
+      this._blockAutoScroll = false;
     },
 
     restart() {
+      this._clearActionWatch();
       localStorage.removeItem('solve_tour_v1');
       localStorage.removeItem('solve_tour_step');
-      this.step = 0;
-      this.active = true;
+      this.step             = 0;
+      this.actionClicked    = false;
+      this.askingMore       = null;
+      this._spotlightEl     = null;
+      this._spotlightEl2    = null;
+      this._drillRowEl      = null;
+      this._blockAutoScroll = false;
+      this.active           = true;
       const self = this;
       this.$nextTick(function () { self.updateSpotlight(); });
+    },
+
+    /* ── Observa clique no botão de ação para liberar "Próximo" ── */
+    _watchAction() {
+      this._clearActionWatch();
+      const s = this.steps[this.step];
+      if (!s) return;
+      const done = this._stepDone(s);
+      /* No modo addingMore: done=true mas agimos como se fosse false para spotlight */
+      const addingMore = !!s.askMore && done && this.askingMore === true;
+      const effectiveDone = addingMore ? false : done;
+      if (effectiveDone) return;
+      if (!addingMore) this.actionClicked = false;
+      const sel = (typeof s.targetFn === 'function') ? s.targetFn(window.location.pathname, effectiveDone) : null;
+      if (!sel || !sel.includes('data-tour-action')) return;
+      const el = document.querySelector(sel);
+      if (!el) return;
+      const self = this;
+      if (addingMore) {
+        /* Limpa spotlight e suprime overlay (actionClicked=true) sem afetar o botão "Já terminei" */
+        this._actionHandler = function () {
+          self.actionClicked = true;
+          self._clearRing();
+          self.spotlight = null;
+          self._clearActionWatch();
+        };
+      } else if (s.keepVisible) {
+        /* keepVisible: limpa ring/spotlight mas NÃO seta actionClicked — Sol permanece visível
+           e actionPending=true até isDone ser satisfeito (ex: meta cadastrada).
+           Limpa _spotlightEl para que o listener de scroll não re-ative o spotlight acidentalmente.
+           Se o step tem watchModal, observa o modal: quando ele fecha sem salvar, restaura o spotlight. */
+        this._actionHandler = function () {
+          self._clearRing();
+          self.spotlight    = null;
+          self._spotlightEl = null;
+          if (s.watchModal) {
+            const modalEl = document.getElementById(s.watchModal);
+            if (modalEl) {
+              const obs = new MutationObserver(function () {
+                if (modalEl.classList.contains('hidden')) {
+                  obs.disconnect();
+                  if (!self._stepDone(self.steps[self.step])) {
+                    self.$nextTick(function () { self.updateSpotlight(); });
+                  }
+                }
+              });
+              obs.observe(modalEl, { attributes: true, attributeFilter: ['class'] });
+            }
+          }
+        };
+      } else {
+        this._actionHandler = function () {
+          self.actionClicked = true;
+          self._clearRing();
+          self.spotlight = null;
+          self.flip = false;
+        };
+      }
+      el.addEventListener('click', this._actionHandler);
+      this._actionEl = el;
+    },
+
+    _clearActionWatch() {
+      if (this._actionEl && this._actionHandler) {
+        this._actionEl.removeEventListener('click', this._actionHandler);
+      }
+      this._actionEl = null;
+      this._actionHandler = null;
+    },
+
+    /* ── Destaque duplo nas colunas de categorias (box-shadow spotlight) ── */
+    _applyCategoryHighlight() {
+      this._clearCategoryHighlight();
+      const pad = 14;
+      const entrada = document.querySelector('[data-tour-categories="entrada"]');
+      const saida   = document.querySelector('[data-tour-categories="saida"]');
+      if (entrada) {
+        const r = entrada.getBoundingClientRect();
+        this.spotlight    = { top: r.top-pad, left: r.left-pad, width: r.width+pad*2, height: r.height+pad*2 };
+        this._spotlightEl = entrada;
+      }
+      if (saida) {
+        const r = saida.getBoundingClientRect();
+        this.spotlight2    = { top: r.top-pad, left: r.left-pad, width: r.width+pad*2, height: r.height+pad*2 };
+        this._spotlightEl2 = saida;
+      }
+    },
+    _clearCategoryHighlight() {
+      this.spotlight2    = null;
+      this._spotlightEl2 = null;
+    },
+
+    /* ── Reposiciona spotlight(s) quando o usuário rola a página ── */
+    _refreshSpotlightPos() {
+      /* Se o modal monitorado estiver aberto, não restaurar spotlight */
+      const _s = this.steps[this.step];
+      if (_s && _s.watchModal) {
+        const _wm = document.getElementById(_s.watchModal);
+        if (_wm && !_wm.classList.contains('hidden')) return;
+      }
+      const pad = 10;
+      /* Spotlight principal */
+      if (this._spotlightEl) {
+        const rect = this._spotlightEl.getBoundingClientRect();
+        if (rect.bottom < 0 || rect.top > window.innerHeight ||
+            rect.right < 0  || rect.left > window.innerWidth) {
+          this.spotlight = null;
+        } else if (this._drillRowEl && !this._drillRowEl.classList.contains('hidden')) {
+          /* Drill-down aberto: expande o spotlight para cobrir header + conteúdo expandido */
+          const dr = this._drillRowEl.getBoundingClientRect();
+          const top  = Math.min(rect.top,  dr.top)  - pad;
+          const bot  = Math.max(rect.bottom, dr.bottom) + pad;
+          const left = Math.min(rect.left, dr.left) - pad;
+          const right= Math.max(rect.right, dr.right) + pad;
+          this.spotlight = { top, left, width: right - left, height: bot - top };
+        } else {
+          this.spotlight = { top: rect.top-pad, left: rect.left-pad, width: rect.width+pad*2, height: rect.height+pad*2 };
+        }
+      }
+      /* Spotlight secundário (categorias) */
+      if (this._spotlightEl2) {
+        const r2 = this._spotlightEl2.getBoundingClientRect();
+        if (r2.bottom < 0 || r2.top > window.innerHeight ||
+            r2.right < 0  || r2.left > window.innerWidth) {
+          this.spotlight2 = null;
+        } else {
+          this.spotlight2 = { top: r2.top-pad, left: r2.left-pad, width: r2.width+pad*2, height: r2.height+pad*2 };
+        }
+      }
+      /* Reavalia flip com base no spotlight principal */
+      if (this.spotlight) {
+        const isMd = window.innerWidth >= 768;
+        const solL = isMd ? 246 : 16;
+        const solR = solL + Math.min(430, window.innerWidth - solL - 20);
+        const solBottom = window.innerHeight - 20;
+        const solTop    = solBottom - 320;
+        const sp = this.spotlight;
+        this.flip = (sp.left < solR && (sp.left + sp.width) > solL &&
+                     sp.top  < solBottom && (sp.top + sp.height) > solTop);
+      }
     },
 
     /* ── Ring pulsante no botão de ação ── */
@@ -450,43 +1125,104 @@ function solTour() {
     /* ── Spotlight dinâmico ── */
     updateSpotlight() {
       this._clearRing();
-      this.flip = false;
+      this._clearCategoryHighlight();
+      this.flip      = false;
+      this.spotlight = null;
+      this._spotlightEl = null;
 
       const s = this.steps[this.step];
       if (!s) { this.spotlight = null; return; }
 
-      const done = s.isDone ? s.isDone(solState) : false;
+      const done = this._stepDone(s);
+      /* No modo addingMore: spotlightar como se done=false para mostrar o botão de ação.
+         Inclui askFirstIfUndone (pergunta pré-ação quando done=false). */
+      const addingMore    = (!!s.askMore && done || !!s.askFirstIfUndone && !done) && this.askingMore === true;
+      const promptMore    = (!!s.askMore && done || !!s.askFirstIfUndone && !done) && this.askingMore === null;
+      const effectiveDone = addingMore ? false : done;
       const path = window.location.pathname;
+
+      /* Durante a pergunta yes/no: sem spotlight — aguarda resposta do usuário */
+      if (promptMore) { this.spotlight = null; this._spotlightEl = null; return; }
+
+      /* Se o modal monitorado estiver aberto, não mostrar spotlight — Sol fica quieta */
+      if (s.watchModal) {
+        const _wm = document.getElementById(s.watchModal);
+        if (_wm && !_wm.classList.contains('hidden')) {
+          this.spotlight = null; this._spotlightEl = null; return;
+        }
+      }
 
       let sel = null;
       if (typeof s.targetFn === 'function') {
-        sel = s.targetFn(path, done);
+        sel = s.targetFn(path, effectiveDone);
       }
 
-      if (!sel) { this.spotlight = null; return; }
+      if (!sel) { this.spotlight = null; this._spotlightEl = null; return; }
 
       const el = document.querySelector(sel);
-      if (!el) { this.spotlight = null; return; }
+      if (!el) { this.spotlight = null; this._spotlightEl = null; return; }
+
+      /* Mantém referência cedo para o scroll listener conseguir reposicionar */
+      this._spotlightEl = el;
 
       const rect = el.getBoundingClientRect();
-      /* Ignora elementos fora da viewport (ex: sidebar móvel fechada) */
-      if (rect.left < -rect.width || rect.top < -rect.height ||
-          rect.left > window.innerWidth || rect.top > window.innerHeight) {
-        this.spotlight = null; return;
+
+      /* Elemento abaixo do fold (ou acima): rola suavemente até ele e re-analisa */
+      if (!this._blockAutoScroll && (rect.top > window.innerHeight - 60 || rect.bottom < 60)) {
+        this.spotlight = null;
+        this.flip = (rect.left + rect.width / 2) < (window.innerWidth / 2 + 80);
+        this._blockAutoScroll = true;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const self = this;
+        setTimeout(function () { self._blockAutoScroll = false; self.updateSpotlight(); }, 600);
+        return;
+      }
+
+      /* Elemento fora da viewport horizontalmente (ex: sidebar fechada no mobile) */
+      if (rect.left < -rect.width || rect.left > window.innerWidth) {
+        this.spotlight = null;
+        this.flip = rect.left < 0;
+        return;
       }
 
       const pad = 10;
-      this.spotlight = {
+      this.spotlight    = {
         top:    rect.top    - pad,
         left:   rect.left   - pad,
         width:  rect.width  + pad * 2,
         height: rect.height + pad * 2,
       };
+      this._spotlightEl = el; /* garante referência para o scroll listener */
 
       /* Ring pulsante apenas em botões de ação (não links de sidebar) */
       if (sel.includes('data-tour-action')) {
         el.classList.add('sol-action-ring');
         this._ringEl = el;
+      }
+
+      /* current-month-row: clicar expande o drill-down — não apaga a Sol, apenas
+         recalcula o spotlight para cobrir o conteúdo expandido. */
+      if (sel.includes('current-month-row')) {
+        const self = this;
+        this._drillRowEl = el.nextElementSibling; /* <tr id="drill-N"> logo abaixo */
+        const drillHandler = function () {
+          setTimeout(function () { self._refreshSpotlightPos(); }, 250);
+        };
+        el.addEventListener('click', drillHandler);
+        this._actionEl     = el;
+        this._actionHandler = drillHandler;
+      }
+      /* Seções informacionais: qualquer clique dentro limpa o overlay para que
+         modais abertos pelo usuário apareçam sem sombreamento da Sol. */
+      else if (sel.includes('data-tour-section')) {
+        const self = this;
+        const clearHandler = function () {
+          self.actionClicked = true; /* suprime overlay */
+          self._clearRing();
+          self.spotlight = null;
+          el.removeEventListener('click', clearHandler, true);
+        };
+        el.addEventListener('click', clearHandler, true /* capture */);
       }
 
       /* Detecta sobreposição entre spotlight e painel da Sol (posição padrão = inferior-esquerda).
@@ -499,6 +1235,9 @@ function solTour() {
       const sp = this.spotlight;
       this.flip = (sp.left < solR && (sp.left + sp.width) > solL &&
                    sp.top  < solBottom && (sp.top + sp.height) > solTop);
+
+      /* Inicia observador de clique no botão de ação */
+      this._watchAction();
     },
   };
 }

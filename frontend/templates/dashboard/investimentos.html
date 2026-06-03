@@ -36,7 +36,7 @@
   </div>
 
   <!-- Patrimônio total hero -->
-  <div class="relative overflow-hidden rounded-2xl bg-obsidian px-6 py-8 shadow-lg">
+  <div class="relative overflow-hidden rounded-2xl bg-obsidian px-6 py-8 shadow-lg" data-tour-section="inv-patrimonio">
     <div class="pointer-events-none absolute inset-0 opacity-[0.03]"
          style="background-image:linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px);background-size:32px 32px"></div>
     <div class="relative">
@@ -59,7 +59,7 @@
   <div class="grid gap-6 lg:grid-cols-2">
 
     <!-- Caixa (contas bancárias) -->
-    <div class="rounded-xl border border-slate-200 bg-white shadow">
+    <div class="rounded-xl border border-slate-200 bg-white shadow" data-tour-section="inv-caixa">
       <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h3 class="font-semibold text-obsidian">Caixa</h3>
         <a href="{% url 'contas' %}" class="text-xs font-medium text-solve hover:text-solve-dark transition-colors">Gerenciar</a>
@@ -79,8 +79,8 @@
                 <p class="text-xs text-smoke">{{ acc.get_type_display }}{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</p>
               </div>
             </div>
-            <p class="text-sm font-bold {% if acc.latest_balance >= 0 %}text-obsidian{% else %}text-red-500{% endif %}">
-              R$&nbsp;{{ acc.latest_balance|default:0|brl }}
+            <p class="text-sm font-bold {% if acc.liquid_balance >= 0 %}text-obsidian{% else %}text-red-500{% endif %}">
+              R$&nbsp;{{ acc.liquid_balance|default:0|brl }}
             </p>
           </li>
           {% endfor %}
@@ -103,7 +103,7 @@
     </div>
 
     <!-- Investimentos por classe -->
-    <div class="rounded-xl border border-slate-200 bg-white shadow">
+    <div class="rounded-xl border border-slate-200 bg-white shadow" data-tour-section="inv-por-classe">
       <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h3 class="font-semibold text-obsidian">Por classe de ativo</h3>
         <span class="text-xs text-smoke">distribuição</span>
@@ -142,7 +142,7 @@
 
   <!-- Ativos por custódia -->
   {% if custody_groups %}
-  <div class="rounded-xl border border-slate-200 bg-white shadow">
+  <div class="rounded-xl border border-slate-200 bg-white shadow" data-tour-section="inv-ativos">
     <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
       <h3 class="font-semibold text-obsidian">Ativos</h3>
       <button onclick="openBoleta('buy')"
@@ -286,7 +286,7 @@ const _INV_MODES  = {{ inv_modes_json|safe }};
 const _INV_PRICES = {{ inv_prices_json|safe }};
 const _INV_QTY    = {{ inv_qty_json|safe }};
 </script>
-<div id="modal-boleta" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+<div id="modal-boleta" class="hidden fixed inset-0 z-[210] flex items-center justify-center bg-black/50 px-4"
      x-data="{
        btype:'buy', inv:'', acc:'', isNew:false, mode:'fin', newMode:'fin',
        qty:'', price:'', fin:'', newPrice:'', oldPrice:0,
@@ -468,6 +468,7 @@ const _INV_QTY    = {{ inv_qty_json|safe }};
           <label class="block text-xs font-semibold text-smoke">Valor (R$) — negativo para perda</label>
           <input type="number" name="amount" step="0.01" placeholder="Ex: 150,00 ou -50,00"
                  :required="btype === 'earnings' && !isQp"
+                 :disabled="btype !== 'earnings' || isQp"
                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
         </div>
         <!-- qp mode: old price + new price → gain calculated automatically -->
@@ -501,6 +502,7 @@ const _INV_QTY    = {{ inv_qty_json|safe }};
         <label class="block text-xs font-semibold text-smoke">Valor recebido (R$)</label>
         <input type="number" name="amount" step="0.01" min="0.01" placeholder="Ex: 150,00"
                :required="btype === 'dividends'"
+               :disabled="btype !== 'dividends'"
                class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solar focus:outline-none focus:ring-1 focus:ring-solar">
         <p class="mt-1 text-[10px] text-smoke/60">Lançado como crédito na conta. Não altera o valor de portfólio do ativo.</p>
       </div>

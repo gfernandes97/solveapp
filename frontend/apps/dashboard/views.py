@@ -80,6 +80,33 @@ def _own_account(user, pk):
     return get_object_or_404(Account, pk=pk, user=user)
 
 
+def _inv_total_from_txs(user):
+    """Return current total investment value derived from InvestmentTransaction history.
+
+    Matches the calculation in the investimentos view: sum of (buy - sell + earnings)
+    per investment, excluding positions where the net is <= 0 (fully exited).
+    Never reads Investment.current_price or Investment.quantity directly, preventing
+    stale model-field values from inflating the displayed patrimônio.
+    """
+    rows = (
+        InvestmentTransaction.objects.filter(user=user)
+        .values("investment_id")
+        .annotate(
+            buy_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_BUY)),
+            sell_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_SELL)),
+            earn_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_EARNINGS)),
+        )
+    )
+    total = Decimal("0")
+    for row in rows:
+        cost = (row["buy_total"] or Decimal("0")) - (row["sell_total"] or Decimal("0"))
+        earn = row["earn_total"] or Decimal("0")
+        current = cost + earn
+        if current > 0:
+            total += current
+    return total
+
+
 def _add_months(d, n):
     total = d.year * 12 + (d.month - 1) + n
     y, m = divmod(total, 12)
@@ -354,9 +381,31 @@ def _projected_cash_balance(user, today):
         delta = row["total"] or Decimal("0")
         acc_net[key] = acc_net.get(key, Decimal("0")) + (delta if row["type"] == "credit" else -delta)
 
+    # Subtract investment portfolio values so the result reflects liquid cash only.
+    # Snapshots for custody/brokerage accounts may include the investment portfolio;
+    # this mirrors the per_acc_snaps_liquid logic used in the projection rows.
+    inv_per_acc: dict = {}
+    for _row in (
+        InvestmentTransaction.objects
+        .filter(user=user, investment__account__isnull=False)
+        .values("investment__account_id")
+        .annotate(
+            buys=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_BUY)),
+            sells=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_SELL)),
+            earns=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_EARNINGS)),
+        )
+    ):
+        _aid = _row["investment__account_id"]
+        if _aid:
+            inv_per_acc[_aid] = (
+                (_row["buys"] or Decimal("0"))
+                - (_row["sells"] or Decimal("0"))
+                + (_row["earns"] or Decimal("0"))
+            )
+
     total = Decimal("0")
     for aid, (snap_mo, snap_bal) in anchor_per_acc.items():
-        bal = snap_bal
+        bal = (snap_bal - inv_per_acc.get(aid, Decimal("0")))
         mo = _add_months(snap_mo, 1)
         while mo <= current_mo:
             bal += acc_net.get((aid, mo), Decimal("0"))
@@ -387,8 +436,7 @@ def overview(request):
     accounts = Account.objects.filter(user=request.user, is_active=True, include_in_total=True)
     cash_balance = _projected_cash_balance(request.user, now.date())
 
-    investments = Investment.objects.filter(user=request.user)
-    inv_value = sum(i.current_value for i in investments)
+    inv_value = _inv_total_from_txs(request.user)
 
     goals_qs = Goal.objects.filter(user=request.user, is_completed=False)
     goals_list = list(goals_qs.order_by("deadline"))
@@ -479,7 +527,7 @@ def overview(request):
         "first_name": first_name,
         "cash_balance": cash_balance,
         "inv_value": inv_value,
-        "patrimonio": cash_balance,
+        "patrimonio": cash_balance + inv_value,
         "income": income,
         "expense": expense,
         "month_balance": month_balance,
@@ -508,62 +556,128 @@ def overview(request):
 @login_required
 def diagnostico(request):
     now = _now_br()
-    try:
-        year = int(request.GET.get("ano", now.year))
-        month = int(request.GET.get("mes", now.month))
-        if not (1 <= month <= 12):
-            raise ValueError
-    except (ValueError, TypeError):
-        year, month = now.year, now.month
+    period = request.GET.get("period", "mes")
+    if period not in ("mes", "ano", "12m", "24m", "inicio"):
+        period = "mes"
 
-    month_start = date(year, month, 1)
-    next_month_start = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    # ── Period boundaries ─────────────────────────────────────────────────────
+    prev_year = next_year = prev_month = next_month = None
+    year = month = None
 
+    if period == "mes":
+        try:
+            year  = int(request.GET.get("ano", now.year))
+            month = int(request.GET.get("mes", now.month))
+            if not (1 <= month <= 12): raise ValueError
+        except (ValueError, TypeError):
+            year, month = now.year, now.month
+        date_from = date(year, month, 1)
+        date_to   = _add_months(date_from, 1)
+        period_months = [date_from]
+        period_label  = f"{_MONTHS[month - 1].capitalize()} {year}"
+        _prev = _add_months(date_from, -1)
+        _next = _add_months(date_from,  1)
+        prev_month, prev_year = _prev.month, _prev.year
+        next_month, next_year = _next.month, _next.year
+
+    elif period == "ano":
+        try:
+            year = int(request.GET.get("ano", now.year))
+        except (ValueError, TypeError):
+            year = now.year
+        date_from = date(year, 1, 1)
+        if year < now.year:
+            date_to    = date(year + 1, 1, 1)
+            n_months   = 12
+        else:
+            date_to    = _add_months(date(now.year, now.month, 1), 1)
+            n_months   = now.month
+        period_months = [date(year, m, 1) for m in range(1, n_months + 1)]
+        period_label  = str(year)
+        prev_year, next_year = year - 1, year + 1
+
+    elif period == "12m":
+        date_to       = _add_months(date(now.year, now.month, 1), 1)
+        date_from     = _add_months(date_to, -12)
+        period_months = [_add_months(date_from, i) for i in range(12)]
+        period_label  = "Últimos 12 meses"
+
+    elif period == "24m":
+        date_to       = _add_months(date(now.year, now.month, 1), 1)
+        date_from     = _add_months(date_to, -24)
+        period_months = [_add_months(date_from, i) for i in range(24)]
+        period_label  = "Últimos 24 meses"
+
+    else:  # inicio
+        _first = (
+            Transaction.objects.filter(account__user=request.user)
+            .order_by("date").values("date").first()
+        )
+        if _first:
+            _fd = _first["date"]
+            if not isinstance(_fd, date): _fd = _fd.date()
+            date_from = _fd.replace(day=1)
+        else:
+            date_from = date(now.year, now.month, 1)
+        date_to  = _add_months(date(now.year, now.month, 1), 1)
+        _n = (date_to.year - date_from.year) * 12 + (date_to.month - date_from.month)
+        period_months = [_add_months(date_from, i) for i in range(max(_n, 1))]
+        period_label  = "Desde o início"
+
+    n_months_in_period = len(period_months)
+
+    # ── Common data ───────────────────────────────────────────────────────────
     cash_balance = _projected_cash_balance(request.user, now.date())
-    investments = Investment.objects.filter(user=request.user)
-    inv_value = Decimal(str(sum(i.current_value for i in investments)))
-    patrimonio = cash_balance + inv_value
+    inv_value    = _inv_total_from_txs(request.user)
+    patrimonio   = cash_balance + inv_value
 
-    month_txs = Transaction.objects.filter(
+    period_txs = Transaction.objects.filter(
         account__user=request.user,
-        date__year=year,
-        date__month=month,
+        date__gte=date_from,
+        date__lt=date_to,
         status=Transaction.STATUS_COMPLETED,
     )
 
-    # Fixos (RecurringTransaction) computed first — they drive the grand totals
     fixos_qs = RecurringTransaction.objects.filter(
         user=request.user,
         is_active=True,
-        start_date__lt=next_month_start,
-    ).filter(Q(end_date__isnull=True) | Q(end_date__gte=month_start))
+        start_date__lt=date_to,
+    ).filter(Q(end_date__isnull=True) | Q(end_date__gte=date_from))
     fixos_exp_list = list(fixos_qs.filter(type=RecurringTransaction.TYPE_EXPENSE).select_related("category"))
     fixos_inc_list = list(fixos_qs.filter(type=RecurringTransaction.TYPE_INCOME).select_related("category"))
-    fixos_exp_total = sum(_amount_for_month(r, month_start) for r in fixos_exp_list)
-    fixos_inc_total = sum(_amount_for_month(r, month_start) for r in fixos_inc_list)
 
-    # Variable amounts from one-off transactions only (exclude investment boletas)
-    var_inc_amt = month_txs.filter(type=Transaction.TYPE_CREDIT, is_transfer=False, is_investment=False).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    var_exp_amt = month_txs.filter(type=Transaction.TYPE_DEBIT, is_transfer=False, is_investment=False).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    def _period_fixo_amt(r):
+        return sum(_amount_for_month(r, m) for m in period_months)
 
-    # Grand totals = variable + fixed
+    fixos_exp_total = sum(_period_fixo_amt(r) for r in fixos_exp_list)
+    fixos_inc_total = sum(_period_fixo_amt(r) for r in fixos_inc_list)
+
+    # Monthly-equivalent totals for "Fixas" header badges
+    fixos_exp_monthly_total = sum(r.monthly_amount for r in fixos_exp_list)
+    fixos_inc_monthly_total = sum(r.monthly_amount for r in fixos_inc_list)
+    fixos_exp_approx = any(r.frequency != RecurringTransaction.FREQ_MONTHLY for r in fixos_exp_list)
+    fixos_inc_approx = any(r.frequency != RecurringTransaction.FREQ_MONTHLY for r in fixos_inc_list)
+
+    var_inc_amt    = period_txs.filter(type=Transaction.TYPE_CREDIT, is_transfer=False, is_investment=False).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    var_exp_amt    = period_txs.filter(type=Transaction.TYPE_DEBIT,  is_transfer=False, is_investment=False).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    inv_income_amt = period_txs.filter(type=Transaction.TYPE_CREDIT, is_investment=True).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+
     fixed_inc_amt = fixos_inc_total
     fixed_exp_amt = fixos_exp_total
-    income  = var_inc_amt + fixos_inc_total
-    expense = var_exp_amt + fixos_exp_total
+    income        = var_inc_amt + fixos_inc_total
+    expense       = var_exp_amt + fixos_exp_total
     month_balance = income - expense
 
-    # Category breakdown — actual transactions only; pct relative to variable totals
     exp_cat_data = [
         {
-            "name": r["category__name"] or "Sem categoria",
-            "icon": r["category__icon"] or "more-horizontal",
-            "color": r["category__color"] or "#64748B",
+            "name":   r["category__name"] or "Sem categoria",
+            "icon":   r["category__icon"] or "more-horizontal",
+            "color":  r["category__color"] or "#64748B",
             "amount": r["total"],
-            "pct": min(int(r["total"] / var_exp_amt * 100), 100) if var_exp_amt else 0,
+            "pct":    min(int(r["total"] / var_exp_amt * 100), 100) if var_exp_amt else 0,
         }
         for r in (
-            month_txs.filter(type=Transaction.TYPE_DEBIT, is_transfer=False, is_investment=False)
+            period_txs.filter(type=Transaction.TYPE_DEBIT, is_transfer=False, is_investment=False)
             .values("category__name", "category__icon", "category__color")
             .annotate(total=Sum("amount"))
             .order_by("-total")
@@ -571,28 +685,26 @@ def diagnostico(request):
     ]
     inc_cat_data = [
         {
-            "name": r["category__name"] or "Sem categoria",
-            "icon": r["category__icon"] or "more-horizontal",
-            "color": r["category__color"] or "#64748B",
+            "name":   r["category__name"] or "Sem categoria",
+            "icon":   r["category__icon"] or "more-horizontal",
+            "color":  r["category__color"] or "#64748B",
             "amount": r["total"],
-            "pct": min(int(r["total"] / var_inc_amt * 100), 100) if var_inc_amt else 0,
+            "pct":    min(int(r["total"] / var_inc_amt * 100), 100) if var_inc_amt else 0,
         }
         for r in (
-            month_txs.filter(type=Transaction.TYPE_CREDIT, is_transfer=False, is_investment=False)
+            period_txs.filter(type=Transaction.TYPE_CREDIT, is_transfer=False, is_investment=False)
             .values("category__name", "category__icon", "category__color")
             .annotate(total=Sum("amount"))
             .order_by("-total")
         )
     ]
 
-    # Merged category data (variable + fixed) for pie charts
     def _merge_cat(base_data, fixos_list, total):
         merged = {}
         for cat in base_data:
-            key = cat["name"]
-            merged[key] = dict(cat)
+            merged[cat["name"]] = dict(cat)
         for r in fixos_list:
-            amt = _amount_for_month(r, month_start)
+            amt = _period_fixo_amt(r)
             if not amt:
                 continue
             cat_name = r.category.name if r.category else "Sem categoria"
@@ -600,8 +712,8 @@ def diagnostico(request):
                 merged[cat_name]["amount"] += amt
             else:
                 merged[cat_name] = {
-                    "name": cat_name,
-                    "icon": r.category.icon if r.category else "more-horizontal",
+                    "name":  cat_name,
+                    "icon":  r.category.icon if r.category else "more-horizontal",
                     "color": r.category.color if r.category else "#64748B",
                     "amount": amt,
                 }
@@ -613,15 +725,35 @@ def diagnostico(request):
     all_exp_cat_data = _merge_cat(exp_cat_data, fixos_exp_list, expense)
     all_inc_cat_data = _merge_cat(inc_cat_data, fixos_inc_list, income)
 
-    savings_rate = max(0, int((income - expense) / income * 100)) if income else 0
+    # Append investment income as a separate slice in the income ring
+    if inv_income_amt:
+        all_inc_cat_data.append({
+            "name":   "Resultado Invest.",
+            "icon":   "trending-up",
+            "color":  "#06B6D4",
+            "amount": inv_income_amt,
+        })
+        all_inc_cat_data.sort(key=lambda x: -x["amount"])
+
+    inc_chart_total = sum(cat["amount"] for cat in all_inc_cat_data) or Decimal("1")
+    exp_chart_total = sum(cat["amount"] for cat in all_exp_cat_data) or Decimal("1")
+    for cat in all_inc_cat_data:
+        cat["pct"] = min(int(cat["amount"] / inc_chart_total * 100), 100)
+    for cat in all_exp_cat_data:
+        cat["pct"] = min(int(cat["amount"] / exp_chart_total * 100), 100)
+
+    savings_rate    = max(0, int((income - expense) / income * 100)) if income else 0
     commitment_rate = min(100, int(fixos_exp_total / income * 100)) if income else 0
 
     cash_pct_diag = int(cash_balance / patrimonio * 100) if patrimonio else 50
-    inv_pct_diag = 100 - cash_pct_diag
+    inv_pct_diag  = 100 - cash_pct_diag
 
     today_date = now.date()
-    goals_qs = Goal.objects.filter(user=request.user, is_completed=False)
+    goals_qs   = Goal.objects.filter(user=request.user, is_completed=False)
     goals_diag = []
+    avg_monthly_balance = (
+        month_balance / Decimal(str(n_months_in_period)) if n_months_in_period > 1 else month_balance
+    )
     for g in goals_qs.order_by("deadline"):
         on_track = None
         months_left = None
@@ -633,55 +765,76 @@ def diagnostico(request):
                 on_track = True
             elif days_remaining > 0:
                 monthly_needed = needed / Decimal(str(max(days_remaining / 30, 0.5)))
-                on_track = month_balance >= monthly_needed
+                on_track = avg_monthly_balance >= monthly_needed
             else:
                 on_track = False
         goals_diag.append({"goal": g, "on_track": on_track, "months_left": months_left})
 
-    if month == 1:
-        prev_month, prev_year = 12, year - 1
-    else:
-        prev_month, prev_year = month - 1, year
-    if month == 12:
-        next_month, next_year = 1, year + 1
-    else:
-        next_month, next_year = month + 1, year
-
     has_data = income > 0 or expense > 0
 
+    balance_label = {
+        "mes":    "Saldo do Mês",
+        "ano":    "Saldo do Ano",
+        "12m":    "Saldo 12M",
+        "24m":    "Saldo 24M",
+        "inicio": "Saldo desde o Início",
+    }.get(period, "Saldo do Período")
+
+    exp_chart_json = json.dumps({
+        "labels":  [cat["name"] for cat in all_exp_cat_data],
+        "amounts": [float(cat["amount"]) for cat in all_exp_cat_data],
+        "total":   float(exp_chart_total),
+    }, ensure_ascii=False)
+    inc_chart_json = json.dumps({
+        "labels":  [cat["name"] for cat in all_inc_cat_data],
+        "amounts": [float(cat["amount"]) for cat in all_inc_cat_data],
+        "total":   float(inc_chart_total),
+    }, ensure_ascii=False)
+
     return render(request, "dashboard/diagnostico.html", {
-        "diag_month_name": _MONTHS[month - 1].capitalize(),
-        "has_data": has_data,
-        "diag_year": year,
-        "month": month,
-        "year": year,
-        "prev_month": prev_month,
-        "prev_year": prev_year,
-        "next_month": next_month,
-        "next_year": next_year,
-        "income": income,
-        "expense": expense,
+        "period":         period,
+        "period_label":   period_label,
+        "balance_label":  balance_label,
+        "period_choices": [("mes", "Mês"), ("ano", "Ano"), ("12m", "12m"), ("24m", "24m"), ("inicio", "Início")],
+        "is_mes":         period == "mes",
+        "is_ano":         period == "ano",
+        "has_data":       has_data,
+        "diag_year":      year or now.year,
+        "month":         month,
+        "year":          year,
+        "prev_month":    prev_month,
+        "prev_year":     prev_year,
+        "next_month":    next_month,
+        "next_year":     next_year,
+        "income":        income,
+        "expense":       expense,
         "month_balance": month_balance,
         "fixed_inc_amt": fixed_inc_amt,
-        "var_inc_amt": var_inc_amt,
+        "var_inc_amt":   var_inc_amt,
         "fixed_exp_amt": fixed_exp_amt,
-        "var_exp_amt": var_exp_amt,
-        "exp_cat_data": exp_cat_data,
-        "inc_cat_data": inc_cat_data,
+        "var_exp_amt":   var_exp_amt,
+        "exp_cat_data":  exp_cat_data,
+        "inc_cat_data":  inc_cat_data,
         "all_exp_cat_data": all_exp_cat_data,
         "all_inc_cat_data": all_inc_cat_data,
-        "fixos_exp_list": fixos_exp_list,
-        "fixos_inc_list": fixos_inc_list,
-        "fixos_exp_total": fixos_exp_total,
-        "fixos_inc_total": fixos_inc_total,
-        "savings_rate": savings_rate,
-        "commitment_rate": commitment_rate,
-        "cash_balance": cash_balance,
-        "inv_value": inv_value,
-        "patrimonio": patrimonio,
-        "cash_pct_diag": cash_pct_diag,
-        "inv_pct_diag": inv_pct_diag,
-        "goals_diag": goals_diag,
+        "exp_chart_json":   exp_chart_json,
+        "inc_chart_json":   inc_chart_json,
+        "fixos_exp_list":         fixos_exp_list,
+        "fixos_inc_list":         fixos_inc_list,
+        "fixos_exp_total":        fixos_exp_total,
+        "fixos_inc_total":        fixos_inc_total,
+        "fixos_exp_monthly_total": fixos_exp_monthly_total,
+        "fixos_inc_monthly_total": fixos_inc_monthly_total,
+        "fixos_exp_approx":       fixos_exp_approx,
+        "fixos_inc_approx":       fixos_inc_approx,
+        "savings_rate":     savings_rate,
+        "commitment_rate":  commitment_rate,
+        "cash_balance":     cash_balance,
+        "inv_value":        inv_value,
+        "patrimonio":       patrimonio,
+        "cash_pct_diag":    cash_pct_diag,
+        "inv_pct_diag":     inv_pct_diag,
+        "goals_diag":       goals_diag,
     })
 
 
@@ -766,6 +919,14 @@ def investimentos(request):
         g["positions"].sort(key=lambda p: (p["inv"].type, p["inv"].name))
     custody_groups = sorted(_by_acc.values(), key=lambda g: g["account"].name if g["account"] else "zzz")
 
+    # Liquid (cash-only) balance per account: snapshot − invested value for that account
+    inv_by_acc: dict = {k: g["total"] for k, g in _by_acc.items() if k}
+    cash_accounts_list = []
+    for _acc in cash_accounts:
+        _snap = _acc.latest_balance or Decimal("0")
+        _acc.liquid_balance = _snap - inv_by_acc.get(_acc.pk, Decimal("0"))
+        cash_accounts_list.append(_acc)
+
     goals = Goal.objects.filter(user=request.user, is_completed=False).order_by("deadline")
     inv_accounts = Account.objects.filter(user=request.user, type__in=_CUSTODY_TYPES, is_active=True)
     boleta_accounts = Account.objects.filter(
@@ -788,12 +949,12 @@ def investimentos(request):
         return float(inv_obj.current_price)
 
     return render(request, "dashboard/investimentos.html", {
-        "cash_accounts": cash_accounts,
+        "cash_accounts": cash_accounts_list,
         "cash_balance": cash_balance,
         "inv_by_type": inv_by_type,
         "inv_total": inv_total,
-        "disponivel": cash_balance - inv_total,
-        "patrimonio": cash_balance,
+        "disponivel": cash_balance,
+        "patrimonio": cash_balance + inv_total,
         "goals": goals,
         "investments": investments,
         "custody_groups": custody_groups,
@@ -867,21 +1028,76 @@ def lancamentos(request):
         return redirect(f"/dashboard/lancamentos/?ano={tx_date.year}&mes={tx_date.month}&tab={tab}")
 
     # ── GET ──
-    try:
-        year = int(request.GET.get("ano", now.year))
-        month = int(request.GET.get("mes", now.month))
-        if not (1 <= month <= 12):
-            raise ValueError
-    except (ValueError, TypeError):
-        year, month = now.year, now.month
+    period = request.GET.get("period", "mes")
+    if period not in ("mes", "ano", "12m", "24m", "inicio"):
+        period = "mes"
 
-    month_name = _MONTHS[month - 1]
+    # ── Period boundaries ─────────────────────────────────────────────────────
+    prev_year = next_year = prev_month = next_month = None
+    year = month = None
+
+    if period == "mes":
+        try:
+            year  = int(request.GET.get("ano", now.year))
+            month = int(request.GET.get("mes", now.month))
+            if not (1 <= month <= 12): raise ValueError
+        except (ValueError, TypeError):
+            year, month = now.year, now.month
+        date_from = date(year, month, 1)
+        date_to   = _add_months(date_from, 1)
+        period_label  = f"{_MONTHS[month - 1].capitalize()} {year}"
+        _prev = _add_months(date_from, -1)
+        _next = _add_months(date_from,  1)
+        prev_month, prev_year = _prev.month, _prev.year
+        next_month, next_year = _next.month, _next.year
+
+    elif period == "ano":
+        try:
+            year = int(request.GET.get("ano", now.year))
+        except (ValueError, TypeError):
+            year = now.year
+        date_from = date(year, 1, 1)
+        if year < now.year:
+            date_to = date(year + 1, 1, 1)
+        else:
+            date_to = _add_months(date(now.year, now.month, 1), 1)
+        period_label  = str(year)
+        prev_year, next_year = year - 1, year + 1
+
+    elif period == "12m":
+        date_to       = _add_months(date(now.year, now.month, 1), 1)
+        date_from     = _add_months(date_to, -12)
+        period_label  = "Últimos 12 meses"
+
+    elif period == "24m":
+        date_to       = _add_months(date(now.year, now.month, 1), 1)
+        date_from     = _add_months(date_to, -24)
+        period_label  = "Últimos 24 meses"
+
+    else:  # inicio
+        _first = (
+            Transaction.objects.filter(account__user=request.user)
+            .order_by("date").values("date").first()
+        )
+        if _first:
+            _fd = _first["date"]
+            if not isinstance(_fd, date): _fd = _fd.date()
+            date_from = _fd.replace(day=1)
+        else:
+            date_from = date(now.year, now.month, 1)
+        date_to      = _add_months(date(now.year, now.month, 1), 1)
+        period_label = "Desde o início"
+
+    is_mes = (period == "mes")
+    is_ano = (period == "ano")
+    month_name = _MONTHS[month - 1] if is_mes else period_label
+
     tab = request.GET.get("tab", "todos")
 
     txs = Transaction.objects.filter(
         account__user=request.user,
-        date__year=year,
-        date__month=month,
+        date__gte=date_from,
+        date__lt=date_to,
     ).select_related("category", "account", "goal").order_by("-date", "-created_at")
 
     if tab == "entradas":
@@ -890,28 +1106,40 @@ def lancamentos(request):
         txs = txs.filter(type=Transaction.TYPE_DEBIT)
 
     income = Transaction.objects.filter(
-        account__user=request.user, date__year=year, date__month=month,
+        account__user=request.user,
+        date__gte=date_from, date__lt=date_to,
         type=Transaction.TYPE_CREDIT, is_transfer=False, is_investment=False,
     ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
     expense = Transaction.objects.filter(
-        account__user=request.user, date__year=year, date__month=month,
+        account__user=request.user,
+        date__gte=date_from, date__lt=date_to,
         type=Transaction.TYPE_DEBIT, is_transfer=False, is_investment=False,
     ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
 
-    month_start = date(year, month, 1)
-    next_month_start = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
-
-    # Only show fixos that are active during the viewed month
-    recurring = RecurringTransaction.objects.filter(
-        user=request.user,
-        is_active=True,
-        start_date__lt=next_month_start,
-    ).filter(
-        Q(end_date__isnull=True) | Q(end_date__gte=month_start)
-    ).select_related("account", "category", "goal").order_by("type", "name")
-
-    rec_income = sum(_amount_for_month(r, month_start) for r in recurring if r.type == RecurringTransaction.TYPE_INCOME)
-    rec_expense = sum(_amount_for_month(r, month_start) for r in recurring if r.type == RecurringTransaction.TYPE_EXPENSE)
+    if is_mes:
+        month_start = date_from
+        next_month_start = date_to
+        recurring = RecurringTransaction.objects.filter(
+            user=request.user,
+            is_active=True,
+            start_date__lt=next_month_start,
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=month_start)
+        ).select_related("account", "category", "goal").order_by("type", "name")
+        rec_income = sum(_amount_for_month(r, month_start) for r in recurring if r.type == RecurringTransaction.TYPE_INCOME)
+        rec_expense = sum(_amount_for_month(r, month_start) for r in recurring if r.type == RecurringTransaction.TYPE_EXPENSE)
+    else:
+        cur_mo = date(now.year, now.month, 1)
+        cur_mo_end = _add_months(cur_mo, 1)
+        recurring = RecurringTransaction.objects.filter(
+            user=request.user,
+            is_active=True,
+            start_date__lt=cur_mo_end,
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=cur_mo)
+        ).select_related("account", "category", "goal").order_by("type", "name")
+        rec_income = sum(_amount_for_month(r, cur_mo) for r in recurring if r.type == RecurringTransaction.TYPE_INCOME)
+        rec_expense = sum(_amount_for_month(r, cur_mo) for r in recurring if r.type == RecurringTransaction.TYPE_EXPENSE)
 
     accounts = Account.objects.filter(user=request.user, is_active=True)
     categories = Category.objects.filter(
@@ -921,21 +1149,18 @@ def lancamentos(request):
     investments = Investment.objects.filter(user=request.user).order_by("name")
     boleta_accounts = accounts.exclude(type=Account.TYPE_CREDIT)
 
-    if month == 1:
-        prev_month, prev_year = 12, year - 1
-    else:
-        prev_month, prev_year = month - 1, year
-    if month == 12:
-        next_month, next_year = 1, year + 1
-    else:
-        next_month, next_year = month + 1, year
-
+    period_choices = [("mes", "Mês"), ("ano", "Ano"), ("12m", "12m"), ("24m", "24m"), ("inicio", "Início")]
     tab_defs = [("todos", "Todos"), ("entradas", "Entradas"), ("saidas", "Saídas"), ("fixos", "Fixos"), ("categorias", "Categorias")]
 
     return render(request, "dashboard/lancamentos.html", {
         "txs": txs,
         "tab": tab,
         "tab_defs": tab_defs,
+        "period": period,
+        "period_label": period_label,
+        "period_choices": period_choices,
+        "is_mes": is_mes,
+        "is_ano": is_ano,
         "month_name": month_name,
         "month": month,
         "year": year,
@@ -963,8 +1188,61 @@ def lancamentos(request):
 @require_POST
 def lancamento_editar(request, pk):
     tx = get_object_or_404(Transaction, pk=pk, account__user=request.user)
+
     if tx.is_investment:
+        try:
+            boleta = tx.inv_boleta
+        except InvestmentTransaction.DoesNotExist:
+            return redirect("lancamentos")
+
+        new_amount = _d(request.POST.get("amount"), tx.amount)
+        new_date   = _dt(request.POST.get("date")) or tx.date
+        new_desc   = request.POST.get("description", "").strip() or tx.description
+
+        if new_amount > 0:
+            acc = tx.account
+
+            # Reverse old balance then apply new
+            if tx.type == Transaction.TYPE_CREDIT:
+                acc.balance = acc.balance - tx.amount + new_amount
+            else:
+                acc.balance = acc.balance + tx.amount - new_amount
+
+            tx.amount      = new_amount
+            tx.date        = new_date
+            tx.description = new_desc
+            tx.save()
+            acc.save(update_fields=["balance"])
+
+            # Sync boleta fields
+            boleta.amount = new_amount
+            boleta.date   = new_date
+            if boleta.quantity and boleta.quantity > 0:
+                boleta.unit_price = (new_amount / boleta.quantity).quantize(Decimal("0.01"))
+            boleta.save(update_fields=["amount", "date", "unit_price"])
+
+            # Recalculate Investment.current_price from full transaction history
+            inv = boleta.investment
+            agg = InvestmentTransaction.objects.filter(
+                user=request.user, investment=inv
+            ).aggregate(
+                buy_total  = Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_BUY)),
+                sell_total = Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_SELL)),
+                earn_total = Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_EARNINGS)),
+            )
+            total_value = (
+                (agg["buy_total"]  or Decimal("0"))
+                - (agg["sell_total"] or Decimal("0"))
+                + (agg["earn_total"] or Decimal("0"))
+            )
+            if inv.quantity > 0:
+                inv.current_price = (total_value / inv.quantity).quantize(Decimal("0.000001"))
+            else:
+                inv.current_price = total_value
+            inv.save(update_fields=["current_price"])
+
         return redirect("lancamentos")
+
     old_amount = tx.amount
     old_type = tx.type
     old_goal_id = tx.goal_id
@@ -1279,6 +1557,10 @@ def contas(request):
         )
     )
 
+    # snap_count via prefetch cache (sem query extra)
+    for acc in all_accounts:
+        acc.snap_count = len(list(acc.monthly_snapshots.all()))
+
     cash_accounts = [a for a in all_accounts if a.type in (Account.TYPE_CHECKING, Account.TYPE_SAVINGS, Account.TYPE_WALLET)]
     credit_accounts = [a for a in all_accounts if a.type == Account.TYPE_CREDIT]
     investment_accounts = [a for a in all_accounts if a.type == Account.TYPE_INVESTMENT]
@@ -1402,7 +1684,7 @@ def metas(request):
                 name=name,
                 description=request.POST.get("description", "").strip(),
                 target_amount=_d(request.POST.get("target_amount")),
-                current_amount=_d(request.POST.get("current_amount")),
+                current_amount=Decimal("0"),
                 deadline=_dt(request.POST.get("deadline")),
                 color=request.POST.get("color", "#00C97A"),
             )
@@ -1520,7 +1802,6 @@ def meta_editar(request, pk):
         g.name = name
         g.description = request.POST.get("description", g.description).strip()
         g.target_amount = _d(request.POST.get("target_amount"), g.target_amount)
-        g.current_amount = _d(request.POST.get("current_amount"), g.current_amount)
         g.deadline = _dt(request.POST.get("deadline")) or g.deadline
         g.color = request.POST.get("color", g.color)
         if g.current_amount >= g.target_amount and not g.is_completed:
@@ -1633,6 +1914,12 @@ def investimento_editar(request, pk):
 @require_POST
 def investimento_boleta(request):
     """Unified boleta: BUY, SELL, or EARNINGS. Also handles inline new-asset creation for BUY."""
+    _redirect_to = request.POST.get("redirect_to", "investimentos")
+    def _success_redirect():
+        if _redirect_to == "projecao":
+            return redirect("projecao")
+        return redirect("investimentos")
+
     boleta_type = request.POST.get("boleta_type", InvestmentTransaction.TYPE_BUY)
     if boleta_type not in (
         InvestmentTransaction.TYPE_BUY,
@@ -1752,7 +2039,7 @@ def investimento_boleta(request):
             cash_transaction=earn_tx,
             notes=notes,
         )
-        return redirect("investimentos")
+        return _success_redirect()
 
     # ── DIVIDENDS ─────────────────────────────────────────────────────────────
     if boleta_type == InvestmentTransaction.TYPE_DIVIDENDS:
@@ -1784,7 +2071,7 @@ def investimento_boleta(request):
             cash_transaction=div_tx,
             notes=notes,
         )
-        return redirect("investimentos")
+        return _success_redirect()
 
     # ── BUY / SELL ────────────────────────────────────────────────────────────
     if not account:
@@ -1860,7 +2147,7 @@ def investimento_boleta(request):
         cash_transaction=cash_tx,
         notes=notes,
     )
-    return redirect("investimentos")
+    return _success_redirect()
 
 
 @login_required
@@ -1919,7 +2206,20 @@ def projecao(request):
         except (ValueError, TypeError):
             return default
 
-    n_past = _int_param("n_past", 3)
+    first_snap = (
+        AccountMonthSnapshot.objects
+        .filter(account__user=request.user)
+        .order_by("month")
+        .values_list("month", flat=True)
+        .first()
+    )
+    if first_snap:
+        first_snap_date = (first_snap if isinstance(first_snap, date) else first_snap.date()).replace(day=1)
+        default_n_past = (current_month.year - first_snap_date.year) * 12 + (current_month.month - first_snap_date.month)
+    else:
+        default_n_past = 3
+
+    n_past = _int_param("n_past", max(default_n_past, 1))
     n_future = _int_param("n", 12)
     view_mode = request.GET.get("view", "table")
     if view_mode not in ("table", "chart"):
@@ -1958,6 +2258,13 @@ def projecao(request):
         per_acc_names[_snap.account_id] = _snap.account.name
         per_acc_colors[_snap.account_id] = _snap.account.color
 
+    # First snapshot month per account — transactions before this month are ignored.
+    acc_first_snap: dict = {}  # {account_id: first_snap_month}
+    for _m, _acc_dict in per_acc_snaps.items():
+        for _aid in _acc_dict:
+            if _aid not in acc_first_snap or _m < acc_first_snap[_aid]:
+                acc_first_snap[_aid] = _m
+
     # Expand transaction query back to the most recent prior cash snapshot so the
     # gap months are available when computing the initial balance anchor.
     prior_snaps = [(m, v) for m, v in cash_snaps.items() if m < start_month]
@@ -1977,7 +2284,7 @@ def projecao(request):
             is_investment=False,
         )
         .annotate(mo=TruncMonth("date"))
-        .values("mo", "type", "is_recurring")
+        .values("mo", "type", "is_recurring", "account_id")
         .annotate(total=Sum("amount"))
     )
 
@@ -1985,7 +2292,13 @@ def projecao(request):
     for row in raw:
         mo = row["mo"] if isinstance(row["mo"], date) else row["mo"].date()
         mo = mo.replace(day=1)
-        actual[(mo, row["type"], row["is_recurring"])] = row["total"] or Decimal("0")
+        _aid = row["account_id"]
+        _first = acc_first_snap.get(_aid)
+        # If the account has a snapshot, only include transactions strictly after it
+        if _first is not None and mo <= _first:
+            continue
+        key = (mo, row["type"], row["is_recurring"])
+        actual[key] = actual.get(key, Decimal("0")) + (row["total"] or Decimal("0"))
 
     # Per-account net transactions for cash accounts (credit − debit per account per month).
     # Uses the same tx_query_start window as `raw`, so tx_query_start is already defined above.
@@ -2008,11 +2321,47 @@ def projecao(request):
     for _row in per_acc_tx_raw:
         _mo = (_row["mo"] if isinstance(_row["mo"], date) else _row["mo"].date()).replace(day=1)
         _aid = _row["account_id"]
+        _first = acc_first_snap.get(_aid)
+        if _first is None or _mo <= _first:
+            continue
         _delta = _row["total"] or Decimal("0")
         _key = (_aid, _mo)
         acc_month_net[_key] = acc_month_net.get(_key, Decimal("0")) + (
             _delta if _row["type"] == "credit" else -_delta
         )
+
+    # Buy/Sell boletas create is_investment=True cash transactions excluded from per_acc_tx_raw.
+    # They must be included in acc_month_net so the batimento doesn't false-alarm when
+    # cash leaves (buy) or enters (sell) an account that is separate from the custody account.
+    _buysell_raw = (
+        InvestmentTransaction.objects.filter(
+            user=request.user,
+            type__in=[InvestmentTransaction.TYPE_BUY, InvestmentTransaction.TYPE_SELL],
+            account__isnull=False,
+            date__gte=tx_query_start,
+            date__lt=_add_months(end_month, 1),
+        )
+        .annotate(mo=TruncMonth("date"))
+        .values("account_id", "mo", "type")
+        .annotate(total=Sum("amount"))
+    )
+    for _row in _buysell_raw:
+        _mo = (_row["mo"] if isinstance(_row["mo"], date) else _row["mo"].date()).replace(day=1)
+        _aid = _row["account_id"]
+        _first = acc_first_snap.get(_aid)
+        if _first is None or _mo <= _first:
+            continue
+        _delta = _row["total"] or Decimal("0")
+        _is_sell = _row["type"] == InvestmentTransaction.TYPE_SELL
+        _sign = Decimal("1") if _is_sell else Decimal("-1")
+        _key = (_aid, _mo)
+        acc_month_net[_key] = acc_month_net.get(_key, Decimal("0")) + _sign * _delta
+        # Also add to `actual` so buy/sell appear in net (variable income/expense).
+        # This makes result_total = end_balance[M] - end_balance[M-1] hold consistently:
+        # sell → variable income (+), buy → variable expense (-).
+        _act_type = "credit" if _is_sell else "debit"
+        _act_key = (_mo, _act_type, False)
+        actual[_act_key] = actual.get(_act_key, Decimal("0")) + _delta
 
     # Dividends: always financial, always impact cash, excluded from portfolio value.
     # Their cash transactions are is_investment=True so they're not in per_acc_tx_raw above.
@@ -2030,14 +2379,20 @@ def projecao(request):
     )
     for _row in _div_raw:
         _mo = (_row["mo"] if isinstance(_row["mo"], date) else _row["mo"].date()).replace(day=1)
-        _key = (_row["account_id"], _mo)
+        _aid = _row["account_id"]
+        _first = acc_first_snap.get(_aid)
+        if _first is None or _mo <= _first:
+            continue
+        _key = (_aid, _mo)
         acc_month_net[_key] = acc_month_net.get(_key, Decimal("0")) + (_row["total"] or Decimal("0"))
 
-    # Earnings from InvestmentTransaction — contributes to inv_result in the forward pass.
+    # Earnings + Dividends — both contribute to inv_result in the forward pass.
+    # Dividends are already in acc_month_net (cash impact); here we capture them
+    # for the investment-result column so they appear in the projection table/chart.
     _earn_raw = (
         InvestmentTransaction.objects.filter(
             user=request.user,
-            type=InvestmentTransaction.TYPE_EARNINGS,
+            type__in=[InvestmentTransaction.TYPE_EARNINGS, InvestmentTransaction.TYPE_DIVIDENDS],
             date__gte=tx_query_start,
             date__lt=_add_months(end_month, 1),
         )
@@ -2048,7 +2403,7 @@ def projecao(request):
     inv_earnings_by_month: dict = {}
     for _row in _earn_raw:
         _m = (_row["mo"] if isinstance(_row["mo"], date) else _row["mo"].date()).replace(day=1)
-        inv_earnings_by_month[_m] = _row["total"] or Decimal("0")
+        inv_earnings_by_month[_m] = inv_earnings_by_month.get(_m, Decimal("0")) + (_row["total"] or Decimal("0"))
 
     # Individual transactions per account per month — for the drill-down detail view.
     # Includes investment transactions (is_investment=True) for visibility; they are
@@ -2069,6 +2424,9 @@ def projecao(request):
     tx_by_acc_month: dict = {}  # {(account_id, month): [Transaction]}
     for _tx in tx_detail_qs:
         _mo = _tx.date.replace(day=1)
+        _first = acc_first_snap.get(_tx.account_id)
+        if _first is None or _mo <= _first:
+            continue
         tx_by_acc_month.setdefault((_tx.account_id, _mo), []).append(_tx)
         per_acc_names.setdefault(_tx.account_id, _tx.account.name)
         per_acc_colors.setdefault(_tx.account_id, _tx.account.color)
@@ -2135,6 +2493,11 @@ def projecao(request):
         for r in recurring_list:
             if r.type != tx_type:
                 continue
+            # If linked to an account that has a snapshot, only count after that snapshot
+            if r.account_id is not None:
+                _first = acc_first_snap.get(r.account_id)
+                if _first is not None and mo <= _first:
+                    continue
             total += _amount_for_month(r, mo)
         return total
 
@@ -2232,6 +2595,11 @@ def projecao(request):
             m = _add_months(m, 1)
 
     # ── Forward pass: end_balance, investment results, batimento ──────────────
+    # Pre-build investments indexed by account for dividend suggestions in batimento.
+    _inv_by_acc: dict = {}
+    for _inv in Investment.objects.filter(user=request.user).select_related("account").order_by("name"):
+        _inv_by_acc.setdefault(_inv.account_id, []).append(_inv)
+
     # Batimento is checked per-account using consecutive monthly snapshots.
     # An account's FIRST snapshot is never compared (no prior month to check against).
     # Only when both snap[M] and snap[M-1] exist for the same account do we verify:
@@ -2268,6 +2636,7 @@ def projecao(request):
                     "batimento_diff": diff,
                     "batimento_abs": abs(diff),
                     "batimento_abs_str": str(abs(diff)),
+                    "account_investments": _inv_by_acc.get(aid, []),
                 })
 
         if batimento_issues:
@@ -2313,9 +2682,14 @@ def projecao(request):
         for (_dk, _dm) in tx_by_acc_month:
             if _dm == mo:
                 _drill_aids.add(_dk)
-        # Include recurring-only accounts for all months (not just future)
+        # Include recurring-only accounts strictly after their first snapshot month
         for _a, _recs in recurring_by_acc.items():
-            if _a is not None and any(_amount_for_month(_r, mo) for _r in _recs):
+            if _a is None:
+                continue
+            _first = acc_first_snap.get(_a)
+            if _first is None or mo <= _first:
+                continue
+            if any(_amount_for_month(_r, mo) for _r in _recs):
                 _drill_aids.add(_a)
 
         def _build_drill_entries(items_iter, is_future_row, acc_id):
@@ -2471,6 +2845,48 @@ def projecao(request):
         Q(user=request.user) | Q(user__isnull=True)
     ).order_by("type", "name")
 
+    # ── Missing snapshot warnings ──────────────────────────────────────────
+    # Find the maximum snapshot month across ALL active custody accounts.
+    # For that month, every active custody account should also have a snapshot.
+    snap_missing = []
+    _max_snap_raw = (
+        AccountMonthSnapshot.objects
+        .filter(account__user=request.user, account__type__in=_CUSTODY_TYPES, account__is_active=True)
+        .order_by("-month")
+        .values_list("month", flat=True)
+        .first()
+    )
+    if _max_snap_raw is not None:
+        _max_mo = (_max_snap_raw if isinstance(_max_snap_raw, date) else _max_snap_raw.date()).replace(day=1)
+        _accs_with_snap = set(
+            AccountMonthSnapshot.objects
+            .filter(account__user=request.user, month__year=_max_mo.year, month__month=_max_mo.month)
+            .values_list("account_id", flat=True)
+        )
+        for _acc in cash_accounts:
+            if _acc.pk not in _accs_with_snap:
+                snap_missing.append({
+                    "account_id": _acc.pk,
+                    "account_name": _acc.name,
+                    "missing_month": _max_mo,
+                    "missing_month_label": f"{_MONTHS[_max_mo.month - 1].capitalize()} {_max_mo.year}",
+                })
+
+    # JSON map used by the batimento modal to filter investments per account.
+    # position types (dividends / earnings / sell): only investments in that account with qty > 0
+    # buy: all investments (may be adding to any position)
+    def _inv_label(i):
+        return f"{i.ticker} — {i.name}" if i.ticker else i.name
+
+    _inv_by_acc_modal = {
+        str(_aid): [{"pk": str(i.pk), "label": _inv_label(i)} for i in _invs if i.quantity > 0]
+        for _aid, _invs in _inv_by_acc.items()
+    }
+    _all_investments_modal = [
+        {"pk": str(i.pk), "label": _inv_label(i)}
+        for i in Investment.objects.filter(user=request.user).order_by("name")
+    ]
+
     return render(request, "dashboard/projecao.html", {
         "rows": rows,
         "n_past": n_past,
@@ -2483,8 +2899,12 @@ def projecao(request):
         "proj_balance_n": proj_balance_n,
         "chart_data": chart_data,
         "warnings_count": warnings_count,
+        "inv_by_acc_json": json.dumps(_inv_by_acc_modal),
+        "all_investments_json": json.dumps(_all_investments_modal),
+        "snap_missing": snap_missing,
         "cash_accounts": cash_accounts,
         "categories": categories,
+        "investments": Investment.objects.filter(user=request.user).order_by("name"),
     })
 
 

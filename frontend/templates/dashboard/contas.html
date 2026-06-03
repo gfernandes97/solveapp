@@ -79,7 +79,7 @@
       <!-- Card footer: register + history -->
       <div class="flex items-center justify-between border-t border-slate-100 px-3 py-2 bg-slate-50/50">
         <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}', '{{ acc.color }}', {% if acc.latest_balance is not None %}'{{ acc.latest_balance }}'{% else %}null{% endif %}, {% if acc.latest_month %}'{{ acc.latest_month|date:"M/Y" }}'{% else %}null{% endif %})"
-                class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-solve transition-colors hover:bg-solve/10" title="Registrar saldo patrimonial da conta no mês" data-tour-action="registrar-saldo">
+                class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-solve transition-colors hover:bg-solve/10" title="Registrar saldo patrimonial da conta no mês"{% if acc.snap_count < 2 and acc.is_active %} data-tour-action="registrar-saldo"{% endif %}>
           <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           Atualizar patrimônio
         </button>
@@ -280,7 +280,7 @@
       </div>
       <div class="flex items-center justify-between border-t border-slate-100 px-3 py-2 bg-slate-50/50">
         <button onclick="openSnapshotModal({{ acc.id }}, '{{ acc.name|escapejs }}', '{{ acc.color }}', {% if acc.latest_balance is not None %}'{{ acc.latest_balance }}'{% else %}null{% endif %}, {% if acc.latest_month %}'{{ acc.latest_month|date:"M/Y" }}'{% else %}null{% endif %})"
-                class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-solve transition-colors hover:bg-solve/10" title="Registrar valor do mês">
+                class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-solve transition-colors hover:bg-solve/10" title="Registrar valor do mês"{% if acc.snap_count < 2 and acc.is_active %} data-tour-action="registrar-saldo"{% endif %}>
           <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           Registrar patrimônio
         </button>

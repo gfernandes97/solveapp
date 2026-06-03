@@ -17,7 +17,7 @@
     </div>
 
     <!-- View toggle -->
-    <div class="flex flex-shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow">
+    <div class="flex flex-shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow" data-tour-section="toggle-view">
       <a href="?n_past={{ n_past }}&n={{ n_future }}&view=table"
          class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors
                 {% if view_mode == 'table' %}bg-obsidian text-white shadow-sm{% else %}text-smoke hover:text-obsidian{% endif %}">
@@ -28,6 +28,7 @@
         Tabela
       </a>
       <a href="?n_past={{ n_past }}&n={{ n_future }}&view=chart"
+         data-tour-action="ir-para-grafico"
          class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors
                 {% if view_mode == 'chart' %}bg-obsidian text-white shadow-sm{% else %}text-smoke hover:text-obsidian{% endif %}">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,22 +113,48 @@
   ════════════════════════════════════ -->
   {% if view_mode == 'table' %}
 
-  {% if warnings_count %}
-  <!-- ─── Batimento warnings ─── -->
-  <div class="rounded-xl border border-solar/30 bg-solar/5 px-5 py-4">
+  {% if warnings_count or snap_missing %}
+  <!-- ─── Pendências (batimento + saldo faltante) ─── -->
+  <div class="rounded-xl border border-solar/30 bg-solar/5 px-5 py-4" data-tour-section="batimento">
     <div class="flex items-start gap-3">
       <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-solar" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
       </svg>
       <div>
-        <p class="font-semibold text-obsidian">Pendência de lançamentos detectada</p>
+        <p class="font-semibold text-obsidian">Pendências detectadas</p>
         <p class="mt-0.5 text-sm text-smoke">
-          {{ warnings_count }} {% if warnings_count == 1 %}mês tem{% else %}meses têm{% endif %} saldo registrado que não bate com os lançamentos. Registre o ajuste abaixo para corrigir.
+          {% if warnings_count %}{{ warnings_count }} {% if warnings_count == 1 %}mês tem{% else %}meses têm{% endif %} saldo que não bate com os lançamentos.{% endif %}
+          {% if snap_missing %}{{ snap_missing|length }} {% if snap_missing|length == 1 %}conta está{% else %}contas estão{% endif %} sem saldo registrado no mês mais recente.{% endif %}
         </p>
       </div>
     </div>
 
     <div class="mt-4 space-y-5">
+
+      {% if snap_missing %}
+      <!-- Saldos faltantes -->
+      <div>
+        <p class="mb-3 text-xs font-semibold text-smoke uppercase tracking-wider">Saldo não informado — {{ snap_missing.0.missing_month_label }}</p>
+        <div class="space-y-2">
+          {% for s in snap_missing %}
+          <a href="{% url 'contas' %}?registrar={{ s.account_id }}"
+             class="group flex w-full items-start gap-3 rounded-xl border-2 border-signal/30 bg-white p-4 text-left shadow transition-all hover:border-signal hover:bg-signal/5 hover:shadow-md">
+            <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-signal/10 text-signal transition-colors group-hover:bg-signal group-hover:text-white">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            </span>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-signal">Registrar saldo</p>
+              <p class="mt-0.5 text-sm font-semibold text-obsidian">{{ s.account_name }}</p>
+              <p class="mt-0.5 text-xs text-smoke">Saldo de {{ s.missing_month_label }} não informado — outras custódias já têm</p>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if warnings_count %}
+      <!-- Batimentos divergentes -->
       {% for row in rows %}{% if row.batimento_ok == False %}
       {% for issue in row.batimento_issues %}
       <div>
@@ -141,40 +168,102 @@
             dos lançamentos
           </span>
         </p>
-        <div>
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {% if issue.batimento_diff > 0 %}
-          <!-- Diff positivo: snapshot > lançamentos → precisa de uma entrada para fechar -->
+
+          <!-- 1 · Receita variável -->
           <button type="button"
                   onclick="openAjusteModal('credit','{{ issue.batimento_abs_str }}',{{ row.month|date:'Y' }},{{ row.month|date:'n' }},'{{ row.label|escapejs }}',{{ issue.account_id }})"
-                  class="group flex w-full items-start gap-3 rounded-xl border-2 border-solve/40 bg-white p-4 text-left shadow transition-all hover:border-solve hover:bg-solve/5 hover:shadow-md">
+                  class="group flex items-start gap-3 rounded-xl border-2 border-solve/40 bg-white p-4 text-left shadow transition-all hover:border-solve hover:bg-solve/5 hover:shadow-md">
             <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-solve/10 text-solve transition-colors group-hover:bg-solve group-hover:text-white">
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 11l5-5m0 0l5 5m-5-5v12"/></svg>
             </span>
             <div class="min-w-0">
               <p class="text-sm font-bold text-solve">Registrar entrada</p>
-              <p class="mt-0.5 text-xl font-black text-obsidian">+R$&nbsp;{{ issue.batimento_abs|brl }}</p>
-              <p class="mt-0.5 text-xs text-smoke">{{ issue.account_name }} · {{ row.label }} · Cobre receita não registrada</p>
+              <p class="mt-0.5 text-lg font-black text-obsidian">+R$&nbsp;{{ issue.batimento_abs|brl }}</p>
+              <p class="mt-0.5 text-xs text-smoke">Receita variável não registrada</p>
             </div>
           </button>
+
+          <!-- 2 · Dividendo / Rendimento (boleta) -->
+          <button type="button"
+                  onclick="openBoletaBatimento('dividends','{{ issue.batimento_abs_str }}','{{ row.month|date:'Y-m-d' }}',{{ issue.account_id }})"
+                  class="group flex items-start gap-3 rounded-xl border-2 border-solar/40 bg-white p-4 text-left shadow transition-all hover:border-solar hover:bg-solar/5 hover:shadow-md">
+            <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-solar/10 text-solar transition-colors group-hover:bg-solar group-hover:text-white">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </span>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-solar">Dividendo / Rendimento</p>
+              <p class="mt-0.5 text-lg font-black text-obsidian">+R$&nbsp;{{ issue.batimento_abs|brl }}</p>
+              <p class="mt-0.5 text-xs text-smoke">Provento de investimento</p>
+            </div>
+          </button>
+
+          <!-- 3 · Venda de ativo (boleta) -->
+          <button type="button"
+                  onclick="openBoletaBatimento('sell','{{ issue.batimento_abs_str }}','{{ row.month|date:'Y-m-d' }}',{{ issue.account_id }})"
+                  class="group flex items-start gap-3 rounded-xl border-2 border-signal/30 bg-white p-4 text-left shadow transition-all hover:border-signal hover:bg-signal/5 hover:shadow-md">
+            <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-signal/10 text-signal transition-colors group-hover:bg-signal group-hover:text-white">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+            </span>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-signal">Venda de ativo</p>
+              <p class="mt-0.5 text-lg font-black text-obsidian">+R$&nbsp;{{ issue.batimento_abs|brl }}</p>
+              <p class="mt-0.5 text-xs text-smoke">Resgate ou desinvestimento</p>
+            </div>
+          </button>
+
           {% else %}
-          <!-- Diff negativo: snapshot < lançamentos → precisa de uma saída para fechar -->
+
+          <!-- 1 · Despesa variável -->
           <button type="button"
                   onclick="openAjusteModal('debit','{{ issue.batimento_abs_str }}',{{ row.month|date:'Y' }},{{ row.month|date:'n' }},'{{ row.label|escapejs }}',{{ issue.account_id }})"
-                  class="group flex w-full items-start gap-3 rounded-xl border-2 border-red-300 bg-white p-4 text-left shadow transition-all hover:border-red-500 hover:bg-red-50 hover:shadow-md">
+                  class="group flex items-start gap-3 rounded-xl border-2 border-red-300 bg-white p-4 text-left shadow transition-all hover:border-red-500 hover:bg-red-50 hover:shadow-md">
             <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-400 transition-colors group-hover:bg-red-500 group-hover:text-white">
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 13l-5 5m0 0l-5-5m5 5V6"/></svg>
             </span>
             <div class="min-w-0">
               <p class="text-sm font-bold text-red-500">Registrar saída</p>
-              <p class="mt-0.5 text-xl font-black text-obsidian">-R$&nbsp;{{ issue.batimento_abs|brl }}</p>
-              <p class="mt-0.5 text-xs text-smoke">{{ issue.account_name }} · {{ row.label }} · Cobre despesa não registrada</p>
+              <p class="mt-0.5 text-lg font-black text-obsidian">-R$&nbsp;{{ issue.batimento_abs|brl }}</p>
+              <p class="mt-0.5 text-xs text-smoke">Despesa variável não registrada</p>
             </div>
           </button>
+
+          <!-- 2 · Rendimento negativo / perda (boleta) -->
+          <button type="button"
+                  onclick="openBoletaBatimento('earnings_neg','{{ issue.batimento_abs_str }}','{{ row.month|date:'Y-m-d' }}',{{ issue.account_id }})"
+                  class="group flex items-start gap-3 rounded-xl border-2 border-solar/40 bg-white p-4 text-left shadow transition-all hover:border-solar hover:bg-solar/5 hover:shadow-md">
+            <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-solar/10 text-solar transition-colors group-hover:bg-solar group-hover:text-white">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>
+            </span>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-solar">Rendimento negativo</p>
+              <p class="mt-0.5 text-lg font-black text-obsidian">-R$&nbsp;{{ issue.batimento_abs|brl }}</p>
+              <p class="mt-0.5 text-xs text-smoke">Perda ou marcação a mercado</p>
+            </div>
+          </button>
+
+          <!-- 3 · Compra de ativo (boleta) -->
+          <button type="button"
+                  onclick="openBoletaBatimento('buy','{{ issue.batimento_abs_str }}','{{ row.month|date:'Y-m-d' }}',{{ issue.account_id }})"
+                  class="group flex items-start gap-3 rounded-xl border-2 border-signal/30 bg-white p-4 text-left shadow transition-all hover:border-signal hover:bg-signal/5 hover:shadow-md">
+            <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-signal/10 text-signal transition-colors group-hover:bg-signal group-hover:text-white">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+            </span>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-signal">Compra de ativo</p>
+              <p class="mt-0.5 text-lg font-black text-obsidian">-R$&nbsp;{{ issue.batimento_abs|brl }}</p>
+              <p class="mt-0.5 text-xs text-smoke">Alocação em investimento</p>
+            </div>
+          </button>
+
           {% endif %}
         </div>
       </div>
       {% endfor %}
       {% endif %}{% endfor %}
+      {% endif %}
+
     </div>
   </div>
   {% endif %}
@@ -246,7 +335,7 @@
         </tr>
 
         {% elif row.is_current %}
-        <tr class="border-y-2 border-obsidian bg-obsidian text-white cursor-pointer select-none" onclick="toggleDrill({{ forloop.counter }})">
+        <tr class="border-y-2 border-obsidian bg-obsidian text-white cursor-pointer select-none" data-tour-section="current-month-row" onclick="toggleDrill({{ forloop.counter }})">
           <td class="sticky left-0 z-10 bg-obsidian px-3 py-3 font-black">
             <svg id="drill-chevron-{{ forloop.counter }}" class="mr-1.5 inline h-3 w-3 text-white/50 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
             <span class="whitespace-nowrap">{{ row.label }}</span>
@@ -418,7 +507,7 @@
        GRÁFICO
   ════════════════════════════════════ -->
   {% else %}
-  <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
+  <div class="rounded-xl border border-slate-200 bg-white p-6 shadow" data-tour-section="projecao-chart">
     <div class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-smoke">
       <!-- bar series → right axis (green) -->
       <span class="flex items-center gap-1.5">
@@ -784,6 +873,99 @@ function toggleDrill(n) {
     chart.update();
   }
 })();
+</script>
+{% endif %}
+
+<!-- ─── Modal: Boleta de ajuste via investimento ─── -->
+{% if investments %}
+<script>
+const _INV_BY_ACC      = {{ inv_by_acc_json|safe }};
+const _ALL_INVESTMENTS = {{ all_investments_json|safe }};
+</script>
+
+<div id="modal-boleta-batimento" class="hidden fixed inset-0 z-[210] flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 id="bbat-title" class="font-black text-obsidian"></h2>
+      <button type="button" onclick="document.getElementById('modal-boleta-batimento').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="form-bbat" method="post" action="{% url 'investimento_boleta' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="redirect_to" value="projecao">
+      <input type="hidden" id="bbat-type"    name="boleta_type">
+      <input type="hidden" id="bbat-amount"  name="amount">
+      <input type="hidden" id="bbat-fin"     name="financeiro">
+      <input type="hidden" id="bbat-date"    name="date">
+      <input type="hidden" id="bbat-account" name="account">
+
+      <!-- Ativo (opções preenchidas dinamicamente) -->
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Ativo</label>
+        <select id="bbat-investment" name="investment" required
+                class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
+        </select>
+        <p id="bbat-no-inv" class="mt-1 hidden text-xs text-solar">Nenhum ativo com posição nesta conta. Cadastre um investimento primeiro.</p>
+      </div>
+
+      <!-- Valor (informativo) -->
+      <div class="rounded-lg bg-slate-50 px-4 py-3 text-center">
+        <p class="text-xs text-smoke">Valor a registrar</p>
+        <p id="bbat-valor-display" class="mt-0.5 text-2xl font-black text-obsidian"></p>
+      </div>
+
+      <button type="submit" id="bbat-submit"
+              class="w-full rounded-lg py-3 text-sm font-black text-white transition-colors">
+        Confirmar
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+// btype: 'dividends' | 'earnings_neg' | 'sell' | 'buy'
+function openBoletaBatimento(btype, amount, date, accountId) {
+  const meta = {
+    dividends:    { title: 'Registrar dividendo',           sign: '+', color: 'bg-solar',  field: 'amount',     value: amount },
+    earnings_neg: { title: 'Registrar rendimento negativo', sign: '-', color: 'bg-solar',  field: 'amount',     value: '-' + amount },
+    sell:         { title: 'Registrar venda de ativo',      sign: '+', color: 'bg-signal', field: 'financeiro', value: amount },
+    buy:          { title: 'Registrar compra de ativo',     sign: '-', color: 'bg-signal', field: 'financeiro', value: amount },
+  }[btype];
+
+  document.getElementById('bbat-title').textContent = meta.title;
+  document.getElementById('bbat-type').value        = btype === 'earnings_neg' ? 'earnings' : btype;
+  document.getElementById('bbat-amount').value      = meta.field === 'amount'     ? meta.value : '';
+  document.getElementById('bbat-fin').value         = meta.field === 'financeiro' ? meta.value : '';
+  document.getElementById('bbat-date').value        = date;
+  document.getElementById('bbat-account').value     = accountId;
+  document.getElementById('bbat-valor-display').textContent =
+    meta.sign + 'R$ ' + parseFloat(amount).toLocaleString('pt-BR', {minimumFractionDigits: 2});
+
+  const sub = document.getElementById('bbat-submit');
+  sub.className = 'w-full rounded-lg py-3 text-sm font-black text-white transition-colors ' + meta.color + ' hover:opacity-90';
+
+  // Filter investments: buy shows all; position types show only account investments with qty > 0
+  const isBuy   = btype === 'buy';
+  const options = isBuy ? _ALL_INVESTMENTS : (_INV_BY_ACC[String(accountId)] || []);
+  const sel     = document.getElementById('bbat-investment');
+  const noInv   = document.getElementById('bbat-no-inv');
+
+  sel.innerHTML = '<option value="">Selecione…</option>';
+  options.forEach(inv => {
+    const opt = document.createElement('option');
+    opt.value = inv.pk;
+    opt.textContent = inv.label;
+    sel.appendChild(opt);
+  });
+
+  const empty = options.length === 0;
+  noInv.classList.toggle('hidden', !empty);
+  sel.classList.toggle('hidden', empty);
+  document.getElementById('bbat-submit').disabled = empty;
+
+  document.getElementById('modal-boleta-batimento').classList.remove('hidden');
+}
 </script>
 {% endif %}
 

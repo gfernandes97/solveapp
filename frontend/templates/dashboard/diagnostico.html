@@ -9,25 +9,50 @@
 {% block content %}
 <div class="space-y-5">
 
-  <!-- Header + navegação de mês -->
+  <!-- Header + seletor de período -->
   <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div class="flex items-center gap-3">
-      <a href="?ano={{ prev_year }}&mes={{ prev_month }}"
-         class="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-smoke transition-colors hover:bg-slate-50">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-        </svg>
-      </a>
-      <div>
-        <h1 class="min-w-40 text-center text-lg font-black capitalize text-obsidian">{{ diag_month_name }} {{ diag_year }}</h1>
+    <div class="flex flex-col gap-2">
+      <!-- Botões de período -->
+      <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow self-start">
+        {% for p, lbl in period_choices %}
+        <a href="?period={{ p }}{% if p == 'mes' %}&ano={{ diag_year|default:'' }}&mes={{ month|default:'' }}{% elif p == 'ano' %}&ano={{ diag_year|default:'' }}{% endif %}"
+           class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors
+                  {% if period == p %}bg-obsidian text-white shadow-sm{% else %}text-smoke hover:text-obsidian{% endif %}">
+          {{ lbl }}
+        </a>
+        {% endfor %}
       </div>
-      <a href="?ano={{ next_year }}&mes={{ next_month }}"
-         class="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-smoke transition-colors hover:bg-slate-50">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-        </svg>
-      </a>
+
+      <!-- Navegação contextual -->
+      <div class="flex items-center gap-2">
+        {% if is_mes %}
+        <a href="?period=mes&ano={{ prev_year }}&mes={{ prev_month }}"
+           class="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-smoke transition-colors hover:bg-slate-50">
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        {% elif is_ano %}
+        <a href="?period=ano&ano={{ prev_year }}"
+           class="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-smoke transition-colors hover:bg-slate-50">
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        {% endif %}
+
+        <h1 class="text-lg font-black capitalize text-obsidian">{{ period_label }}</h1>
+
+        {% if is_mes %}
+        <a href="?period=mes&ano={{ next_year }}&mes={{ next_month }}"
+           class="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-smoke transition-colors hover:bg-slate-50">
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </a>
+        {% elif is_ano %}
+        <a href="?period=ano&ano={{ next_year }}"
+           class="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-smoke transition-colors hover:bg-slate-50">
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </a>
+        {% endif %}
+      </div>
     </div>
+
     <span class="inline-flex items-center gap-1.5 self-start rounded-lg bg-signal/10 px-3 py-1.5 text-xs font-semibold text-signal sm:self-auto">
       <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
@@ -46,7 +71,7 @@
         </svg>
       </div>
       <div>
-        <p class="text-base font-bold text-obsidian">Nenhum lançamento em {{ diag_month_name }} {{ diag_year }}</p>
+        <p class="text-base font-bold text-obsidian">Nenhum lançamento em {{ period_label }}</p>
         <p class="mt-1 max-w-sm text-sm text-smoke">Registre receitas e despesas neste mês para ver o diagnóstico completo do seu fluxo financeiro.</p>
       </div>
       <a href="{% url 'lancamentos' %}?ano={{ year }}&mes={{ month }}"
@@ -98,7 +123,7 @@
     </div>
 
     <div class="rounded-xl border border-slate-200 bg-white p-5 shadow">
-      <p class="text-xs font-semibold uppercase tracking-wide text-smoke">Saldo do Mês</p>
+      <p class="text-xs font-semibold uppercase tracking-wide text-smoke">{{ balance_label }}</p>
       <p class="mt-2 text-2xl font-black {% if month_balance >= 0 %}text-solve{% else %}text-red-500{% endif %}">
         {% if month_balance >= 0 %}+{% endif %}R$&nbsp;{{ month_balance|brl }}
       </p>
@@ -128,7 +153,7 @@
   </div>
 
   <!-- Fluxo do mês: fixo vs variável -->
-  <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
+  <div class="rounded-xl border border-slate-200 bg-white p-6 shadow" data-tour-section="fluxo">
     <h3 class="font-semibold text-obsidian">Fluxo do Mês — Fixo vs Variável</h3>
     <p class="mt-0.5 text-xs text-smoke">Composição das entradas e saídas por modalidade</p>
     <div class="mt-5 space-y-5">
@@ -191,12 +216,12 @@
   </div>
 
   <!-- Fixos comprometidos -->
-  <div class="grid gap-5 lg:grid-cols-2">
+  <div class="grid gap-5 lg:grid-cols-2" data-tour-section="fixos">
 
     <div class="rounded-xl border border-slate-200 bg-white shadow">
       <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h3 class="font-semibold text-obsidian">Despesas Fixas</h3>
-        <span class="text-xs font-semibold text-red-500">R$&nbsp;{{ fixos_exp_total|brl }}/mês</span>
+        <span class="text-xs font-semibold text-red-500">{% if fixos_exp_approx %}~{% endif %}R$&nbsp;{{ fixos_exp_monthly_total|brl }}/mês</span>
       </div>
       {% if fixos_exp_list %}
         <ul class="divide-y divide-slate-50">
@@ -218,7 +243,7 @@
                 <p class="text-xs text-smoke">{{ r.get_frequency_display }}</p>
               </div>
             </div>
-            <p class="ml-3 flex-shrink-0 text-sm font-semibold text-red-500">R$&nbsp;{{ r.monthly_amount|brl }}</p>
+            <p class="ml-3 flex-shrink-0 text-sm font-semibold text-red-500">R$&nbsp;{{ r.amount|brl }}</p>
           </li>
           {% endfor %}
         </ul>
@@ -233,7 +258,7 @@
     <div class="rounded-xl border border-slate-200 bg-white shadow">
       <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h3 class="font-semibold text-obsidian">Receitas Fixas</h3>
-        <span class="text-xs font-semibold text-solve">R$&nbsp;{{ fixos_inc_total|brl }}/mês</span>
+        <span class="text-xs font-semibold text-solve">{% if fixos_inc_approx %}~{% endif %}R$&nbsp;{{ fixos_inc_monthly_total|brl }}/mês</span>
       </div>
       {% if fixos_inc_list %}
         <ul class="divide-y divide-slate-50">
@@ -255,7 +280,7 @@
                 <p class="text-xs text-smoke">{{ r.get_frequency_display }}</p>
               </div>
             </div>
-            <p class="ml-3 flex-shrink-0 text-sm font-semibold text-solve">R$&nbsp;{{ r.monthly_amount|brl }}</p>
+            <p class="ml-3 flex-shrink-0 text-sm font-semibold text-solve">R$&nbsp;{{ r.amount|brl }}</p>
           </li>
           {% endfor %}
         </ul>
@@ -269,86 +294,84 @@
 
   </div>
 
-  <!-- Receitas + Gastos por categoria -->
-  <div class="grid gap-5 lg:grid-cols-2">
-
-    <!-- Receitas por Categoria -->
-    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
-      <div class="mb-4 flex items-center justify-between">
-        <div>
-          <h3 class="font-semibold text-obsidian">Receitas por Categoria</h3>
-          <p class="text-xs text-smoke">Variáveis + fixos</p>
-        </div>
-        <span class="text-xs font-semibold text-solve">R$&nbsp;{{ income|brl }}</span>
+  <!-- Receitas + Gastos por categoria — anel duplo -->
+  <div class="rounded-xl border border-slate-200 bg-white p-6 shadow" data-tour-section="categorias">
+    <div class="mb-5 flex items-center justify-between">
+      <div>
+        <h3 class="font-semibold text-obsidian">Receitas e Gastos por Categoria</h3>
+        <p class="text-xs text-smoke">Anel externo: receitas · Anel interno: gastos</p>
       </div>
-      {% if all_inc_cat_data %}
-        <div class="flex justify-center">
-          <div class="relative h-48 w-48">
-            <canvas id="chart-inc-cat"></canvas>
-          </div>
-        </div>
-        <ul id="legend-inc-cat" class="mt-5 space-y-2.5">
-          {% for cat in all_inc_cat_data %}
-          <li class="flex items-center justify-between" data-idx="{{ forloop.counter0 }}">
-            <div class="flex min-w-0 items-center gap-2">
-              <span class="inc-dot h-2.5 w-2.5 flex-shrink-0 rounded-full"></span>
-              <span class="truncate text-sm text-obsidian">{{ cat.name }}</span>
-            </div>
-            <div class="ml-3 flex flex-shrink-0 items-center gap-3 text-xs">
-              <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
-              <span class="tabular-nums text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
-            </div>
-          </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <div class="flex flex-col items-center gap-2 py-8 text-center">
-          <p class="text-sm text-smoke">Nenhum lançamento com categoria</p>
-        </div>
-      {% endif %}
+      <div class="flex items-center gap-4 text-xs font-semibold">
+        <span class="text-solve">↑ R$&nbsp;{{ income|brl }}</span>
+        <span class="text-red-500">↓ R$&nbsp;{{ expense|brl }}</span>
+      </div>
     </div>
 
-    <!-- Gastos por Categoria -->
-    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
-      <div class="mb-4 flex items-center justify-between">
-        <div>
-          <h3 class="font-semibold text-obsidian">Gastos por Categoria</h3>
-          <p class="text-xs text-smoke">Variáveis + fixos</p>
-        </div>
-        <span class="text-xs font-semibold text-red-500">R$&nbsp;{{ expense|brl }}</span>
-      </div>
-      {% if all_exp_cat_data %}
-        <div class="flex justify-center">
-          <div class="relative h-48 w-48">
-            <canvas id="chart-exp-cat"></canvas>
-          </div>
-        </div>
-        <ul id="legend-exp-cat" class="mt-5 space-y-2.5">
-          {% for cat in all_exp_cat_data %}
-          <li class="flex items-center justify-between" data-idx="{{ forloop.counter0 }}">
-            <div class="flex min-w-0 items-center gap-2">
-              <span class="exp-dot h-2.5 w-2.5 flex-shrink-0 rounded-full"></span>
-              <span class="truncate text-sm text-obsidian">{{ cat.name }}</span>
-            </div>
-            <div class="ml-3 flex flex-shrink-0 items-center gap-3 text-xs">
-              <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
-              <span class="tabular-nums text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
-            </div>
-          </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <div class="flex flex-col items-center gap-2 py-8 text-center">
-          <p class="text-sm text-smoke">Nenhum lançamento com categoria</p>
-        </div>
-      {% endif %}
-    </div>
+    <div class="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
 
+      <!-- Gráfico -->
+      <div class="flex-shrink-0 flex justify-center">
+        <div class="relative h-56 w-56">
+          <canvas id="chart-cat-dual"></canvas>
+        </div>
+      </div>
+
+      <!-- Legendas lado a lado -->
+      <div class="flex-1 grid grid-cols-2 gap-x-6 gap-y-1 self-center">
+
+        <!-- Receitas -->
+        <div>
+          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-smoke">Receitas</p>
+          {% if all_inc_cat_data %}
+          <ul id="legend-inc-cat" class="space-y-2">
+            {% for cat in all_inc_cat_data %}
+            <li class="flex items-center justify-between gap-2" data-idx="{{ forloop.counter0 }}">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="inc-dot h-2 w-2 flex-shrink-0 rounded-full"></span>
+                <span class="truncate text-xs text-obsidian">{{ cat.name }}</span>
+              </div>
+              <div class="flex flex-shrink-0 items-center gap-2 text-xs">
+                <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
+                <span class="tabular-nums text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-xs text-smoke">Sem dados</p>
+          {% endif %}
+        </div>
+
+        <!-- Gastos -->
+        <div>
+          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-smoke">Gastos</p>
+          {% if all_exp_cat_data %}
+          <ul id="legend-exp-cat" class="space-y-2">
+            {% for cat in all_exp_cat_data %}
+            <li class="flex items-center justify-between gap-2" data-idx="{{ forloop.counter0 }}">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="exp-dot h-2 w-2 flex-shrink-0 rounded-full"></span>
+                <span class="truncate text-xs text-obsidian">{{ cat.name }}</span>
+              </div>
+              <div class="flex flex-shrink-0 items-center gap-2 text-xs">
+                <span class="font-semibold text-obsidian">{{ cat.pct }}%</span>
+                <span class="tabular-nums text-smoke">R$&nbsp;{{ cat.amount|brl }}</span>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-xs text-smoke">Sem dados</p>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
   </div>
 
   <!-- Análise de Metas -->
   {% if goals_diag %}
-  <div class="rounded-xl border border-slate-200 bg-white shadow">
+  <div class="rounded-xl border border-slate-200 bg-white shadow" data-tour-section="metas">
     <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
       <h3 class="font-semibold text-obsidian">Análise de Metas</h3>
       <a href="{% url 'metas' %}" class="text-xs font-medium text-solve hover:text-solve-dark transition-colors">Gerenciar</a>
@@ -393,7 +416,7 @@
   {% endif %}
 
   <!-- Composição do Patrimônio -->
-  <div class="rounded-xl border border-slate-200 bg-white p-6 shadow">
+  <div class="rounded-xl border border-slate-200 bg-white p-6 shadow" data-tour-section="patrimonio">
     <h3 class="font-semibold text-obsidian">Composição do Patrimônio</h3>
     <p class="mt-0.5 text-xs text-smoke">Distribuição entre caixa e investimentos</p>
     <div class="mt-5">
@@ -440,54 +463,18 @@
 (function () {
   const fmtBRL = v => 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
-  // Receitas: verde-marca → azul → âmbar → tonalidades derivadas
-  const INC_PALETTE = [
-    '#00C97A', '#2563EB', '#F59E0B', '#33D48E',
-    '#1D4ED8', '#D97706', '#00A862', '#0EA5E9',
-    '#A78BFA', '#38BDF8',
-  ];
-
-  // Gastos: paleta quente-vibrante, distinta das receitas, coesa com a marca
-  const EXP_PALETTE = [
-    '#F97316', '#8B5CF6', '#EC4899', '#F59E0B',
-    '#06B6D4', '#6366F1', '#EF4444', '#14B8A6',
-    '#A855F7', '#2563EB',
-  ];
-
-  function makeDoughnut(canvasId, labels, amounts, palette) {
-    const el = document.getElementById(canvasId);
-    if (!el) return;
-    const colors = amounts.map((_, i) => palette[i % palette.length]);
-    new Chart(el, {
-      type: 'doughnut',
-      data: {
-        labels: labels,
-        datasets: [{
-          data: amounts,
-          backgroundColor: colors,
-          borderColor: '#fff',
-          borderWidth: 2,
-          hoverOffset: 6,
-        }]
-      },
-      options: {
-        cutout: '62%',
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => ' ' + ctx.label + ': ' + fmtBRL(ctx.raw),
-            },
-            backgroundColor: '#0F172A',
-            titleColor: '#fff',
-            bodyColor: '#CBD5E1',
-            padding: 10,
-            cornerRadius: 8,
-          },
-        },
-      },
+  /**
+   * Gera N cores com máximo contraste para uma faixa de hue.
+   * Distribui hues uniformemente e alterna luminosidade escuro/claro,
+   * garantindo que itens adjacentes na legenda nunca sejam parecidos.
+   */
+  function buildPalette(n, hStart, hEnd, sat) {
+    sat = sat !== undefined ? sat : 82;
+    return Array.from({length: n}, (_, i) => {
+      const t   = n <= 1 ? 0.5 : i / (n - 1);
+      const hue = Math.round(hStart + (hEnd - hStart) * t);
+      const L   = i % 2 === 0 ? 34 : 62;
+      return 'hsl(' + hue + ',' + sat + '%,' + L + '%)';
     });
   }
 
@@ -498,25 +485,125 @@
     });
   }
 
-  {% if all_inc_cat_data %}
-  makeDoughnut(
-    'chart-inc-cat',
-    [{% for c in all_inc_cat_data %}"{{ c.name|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
-    [{% for c in all_inc_cat_data %}{{ c.amount }}{% if not forloop.last %},{% endif %}{% endfor %}],
-    INC_PALETTE
-  );
-  applyLegendColors('legend-inc-cat', 'inc-dot', INC_PALETTE);
-  {% endif %}
+  (function () {
+    const el = document.getElementById('chart-cat-dual');
+    if (!el) return;
 
-  {% if all_exp_cat_data %}
-  makeDoughnut(
-    'chart-exp-cat',
-    [{% for c in all_exp_cat_data %}"{{ c.name|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
-    [{% for c in all_exp_cat_data %}{{ c.amount }}{% if not forloop.last %},{% endif %}{% endfor %}],
-    EXP_PALETTE
-  );
-  applyLegendColors('legend-exp-cat', 'exp-dot', EXP_PALETTE);
-  {% endif %}
+    const inc = {{ inc_chart_json|safe }};
+    const exp = {{ exp_chart_json|safe }};
+
+    // Paletas dinâmicas: máximo contraste para o n real de cada anel.
+    // Receitas → faixa de verdes (140°–172°), Gastos → vermelhos/laranjas (0°–32°).
+    const INC_PALETTE = buildPalette(inc.amounts.length, 140, 172);
+    const EXP_PALETTE = buildPalette(exp.amounts.length, 0,   32);
+
+    // Escala angular comum — mesmo valor = mesmo ângulo nos dois anéis.
+    const scale   = Math.max(inc.total, exp.total);
+    const surplus = inc.total - exp.total;   // positivo = saldo favorável
+    const SURPLUS_LBL = '__surplus__';
+    const DEFICIT_LBL = '__deficit__';
+
+    // Creates a diagonal-stripe CanvasPattern for the surplus/deficit gap segment.
+    function hatchPattern(strokeColor, bgColor) {
+      const sz = 8;
+      const pat = document.createElement('canvas');
+      pat.width = sz; pat.height = sz;
+      const pc = pat.getContext('2d');
+      pc.fillStyle = bgColor;
+      pc.fillRect(0, 0, sz, sz);
+      pc.strokeStyle = strokeColor;
+      pc.lineWidth = 1.2;
+      pc.beginPath();
+      pc.moveTo(0, sz);   pc.lineTo(sz, 0);
+      pc.moveTo(-sz / 2, sz / 2); pc.lineTo(sz / 2, -sz / 2);
+      pc.moveTo(sz / 2,  sz + sz / 2); pc.lineTo(sz + sz / 2, sz / 2);
+      pc.stroke();
+      return el.getContext('2d').createPattern(pat, 'repeat');
+    }
+
+    function buildRing(d, palette, gapLabel) {
+      const amounts = d.amounts.slice();
+      const colors  = amounts.map((_, i) => palette[i % palette.length]);
+      const hovers  = colors.slice();
+      const labels  = d.labels.slice();
+      const borders = amounts.map(() => '#fff');
+      const bwidths = amounts.map(() => 2);
+      const gap = scale - d.total;
+      if (gap > 0.001 && gapLabel) {
+        amounts.push(gap);
+        const isSurplus = gapLabel === SURPLUS_LBL;
+        const strokeC = isSurplus ? 'rgba(0,201,122,0.6)'  : 'rgba(239,68,68,0.6)';
+        const fillC   = isSurplus ? 'rgba(0,201,122,0.07)' : 'rgba(239,68,68,0.07)';
+        colors.push(hatchPattern(strokeC, fillC));
+        hovers.push( isSurplus ? 'rgba(0,201,122,0.22)'  : 'rgba(239,68,68,0.22)');
+        borders.push(isSurplus ? 'rgba(0,201,122,0.40)'  : 'rgba(239,68,68,0.40)');
+        bwidths.push(1);
+        labels.push(gapLabel);
+      }
+      return { amounts, colors, hovers, labels, borders, bwidths };
+    }
+
+    // Receitas maior → anel de gastos (interno) mostra saldo positivo.
+    // Gastos maior  → anel de receitas (externo) mostra o déficit.
+    const incRing = buildRing(inc, INC_PALETTE, surplus <= 0 ? DEFICIT_LBL : null);
+    const expRing = buildRing(exp, EXP_PALETTE, surplus >  0 ? SURPLUS_LBL : null);
+
+    new Chart(el, {
+      type: 'doughnut',
+      data: {
+        datasets: [
+          {
+            data: incRing.amounts,
+            backgroundColor:      incRing.colors,
+            hoverBackgroundColor: incRing.hovers,
+            borderColor:  incRing.borders,
+            borderWidth:  incRing.bwidths,
+            hoverOffset: 4,
+            _labels: incRing.labels,
+          },
+          {
+            data: expRing.amounts,
+            backgroundColor:      expRing.colors,
+            hoverBackgroundColor: expRing.hovers,
+            borderColor:  expRing.borders,
+            borderWidth:  expRing.bwidths,
+            hoverOffset: 4,
+            _labels: expRing.labels,
+          },
+        ],
+      },
+      options: {
+        cutout: '50%',
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: items => {
+                if (!items.length) return '';
+                const it  = items[0];
+                const lbl = (it.chart.data.datasets[it.datasetIndex]._labels || [])[it.dataIndex] || '';
+                if (lbl === SURPLUS_LBL) return 'Saldo positivo do período';
+                if (lbl === DEFICIT_LBL) return 'Déficit do período';
+                const ring = it.datasetIndex === 0 ? 'Receita' : 'Gasto';
+                return lbl ? lbl + ' (' + ring + ')' : ring;
+              },
+              label: ctx => ' ' + fmtBRL(ctx.raw),
+            },
+            backgroundColor: '#0F172A',
+            titleColor: '#fff',
+            bodyColor: '#CBD5E1',
+            padding: 10,
+            cornerRadius: 8,
+          },
+        },
+      },
+    });
+
+    applyLegendColors('legend-inc-cat', 'inc-dot', INC_PALETTE);
+    applyLegendColors('legend-exp-cat', 'exp-dot', EXP_PALETTE);
+  })();
 })();
 </script>
 {% endif %}

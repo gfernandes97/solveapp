@@ -53,10 +53,10 @@ ACHIEVEMENTS = {
         "description": "Definiu metas financeiras",
         "icon": "🎯",
         "viva": False,
-        "thresholds":        [1, 2, 3, 5],
-        "tier_pts":          [200, 300, 450, 700],
-        "criterion_labels":  ["1 meta criada", "2 metas criadas",
-                               "3 metas criadas", "5 metas criadas"],
+        "thresholds":        [1, 3, 7, 12],
+        "tier_pts":          [100, 250, 420, 650],
+        "criterion_labels":  ["1 meta criada", "3 metas criadas",
+                               "7 metas criadas", "12 metas criadas"],
         "metric_fmt":        "{v} meta(s) criada(s)",
     },
     "goal_completed": {
@@ -76,7 +76,7 @@ ACHIEVEMENTS = {
         "icon": "🚀",
         "viva": True,
         "thresholds":        [1, 2, 3, 4],
-        "tier_pts":          [150, 250, 400, 650],
+        "tier_pts":          [80, 160, 280, 420],
         "criterion_labels":  ["Conta + saldo registrado",
                                "+ primeiro lançamento",
                                "+ fixo/recorrente configurado",
@@ -88,10 +88,10 @@ ACHIEVEMENTS = {
         "description": "Cadastrou investimentos",
         "icon": "💼",
         "viva": False,
-        "thresholds":        [1, 3, 5, 10],
-        "tier_pts":          [250, 400, 650, 1000],
-        "criterion_labels":  ["1 investimento cadastrado", "3 investimentos",
-                               "5 investimentos", "10 investimentos"],
+        "thresholds":        [1, 5, 10, 20],
+        "tier_pts":          [150, 350, 600, 950],
+        "criterion_labels":  ["1 investimento cadastrado", "5 investimentos",
+                               "10 investimentos", "20 investimentos"],
         "metric_fmt":        "{v} investimento(s) cadastrado(s)",
     },
     # ── Vivas ─────────────────────────────────────────────────────────────────
@@ -133,10 +133,10 @@ ACHIEVEMENTS = {
         "description": "Recorrentes ativos configurados",
         "icon": "🔁",
         "viva": True,
-        "thresholds":        [1, 3, 5, 8],
-        "tier_pts":          [150, 350, 600, 900],
-        "criterion_labels":  ["1 fixo ativo", "3 fixos ativos",
-                               "5 fixos ativos", "8 fixos ativos"],
+        "thresholds":        [2, 5, 8, 12],
+        "tier_pts":          [100, 280, 520, 820],
+        "criterion_labels":  ["2 fixos ativos", "5 fixos ativos",
+                               "8 fixos ativos", "12 fixos ativos"],
         "metric_fmt":        "{v} fixo(s) ativo(s) atualmente",
     },
 }
@@ -327,19 +327,19 @@ def check_achievements(user, request=None):
                            [1, 50, 200, 500]),
                   False, request)
     _update_level(user, "first_goal",
-                  _tlevel(Goal.objects.filter(user=user).count(), [1, 2, 3, 5]),
+                  _tlevel(Goal.objects.filter(user=user).count(), [1, 3, 7, 12]),
                   False, request)
     _update_level(user, "goal_completed",
                   _tlevel(Goal.objects.filter(user=user, is_completed=True).count(), [1, 2, 3, 5]),
                   False, request)
     _update_level(user, "first_investment",
-                  _tlevel(Investment.objects.filter(user=user).count(), [1, 3, 5, 10]),
+                  _tlevel(Investment.objects.filter(user=user).count(), [1, 5, 10, 20]),
                   False, request)
     _update_level(user, "setup_complete", _setup_steps(user), True, request)
 
     _update_level(user, "fixos_configured",
                   _tlevel(RecurringTransaction.objects.filter(user=user, is_active=True).count(),
-                           [1, 3, 5, 8]),
+                           [2, 5, 8, 12]),
                   True, request)
     _update_level(user, "first_snapshot",
                   _tlevel(_snapshot_streak(user), [1, 3, 6, 12]),
@@ -476,18 +476,31 @@ def compute_health_score(user):
     next_month_start = date(year, month + 1, 1) if month < 12 else date(year + 1, 1, 1)
 
     # ── Setup (15pts) ─────────────────────────────────────────────────────────
-    has_account  = Account.objects.filter(user=user).exists()
-    has_snapshot = AccountMonthSnapshot.objects.filter(account__user=user).exists()
-    has_fixo     = RecurringTransaction.objects.filter(user=user, is_active=True).exists()
-    setup_pts = (5 if has_account else 0) + (5 if has_snapshot else 0) + (5 if has_fixo else 0)
+    # Accounts (5pts): 1pt ≥1, 3pt ≥2, 5pt ≥4 (requires building a complete picture)
+    active_acc_count = Account.objects.filter(user=user, is_active=True).count()
+    account_pts = 5 if active_acc_count >= 4 else 3 if active_acc_count >= 2 else 1 if active_acc_count >= 1 else 0
+
+    # Snapshots (5pts): require time — 4+ months AND 2+ accounts for full credit
+    snap_months_n = AccountMonthSnapshot.objects.filter(account__user=user).values("month").distinct().count()
+    snap_accs_n   = AccountMonthSnapshot.objects.filter(account__user=user).values("account_id").distinct().count()
+    snapshot_pts = 5 if (snap_months_n >= 4 and snap_accs_n >= 2) else 3 if (snap_months_n >= 2 and snap_accs_n >= 2) else 2 if snap_months_n >= 2 else 1 if snap_months_n >= 1 else 0
+
+    # Fixos (5pts): require richer mapping — 1pt any, 3pt 1inc+2exp, 5pt 2inc+4exp
+    inc_fixo_n = RecurringTransaction.objects.filter(user=user, is_active=True, type=RecurringTransaction.TYPE_INCOME).count()
+    exp_fixo_n = RecurringTransaction.objects.filter(user=user, is_active=True, type=RecurringTransaction.TYPE_EXPENSE).count()
+    fixo_pts = 5 if (inc_fixo_n >= 2 and exp_fixo_n >= 4) else 3 if (inc_fixo_n >= 1 and exp_fixo_n >= 2) else 1 if (inc_fixo_n + exp_fixo_n) >= 1 else 0
+
+    setup_pts = account_pts + snapshot_pts + fixo_pts
 
     # ── Savings rate (25pts) ──────────────────────────────────────────────────
-    inc = Transaction.objects.filter(
+    # Variable transactions are required to unlock the higher tiers;
+    # fixos-only income produces a rate but caps the score at 10pts.
+    inc_var = Transaction.objects.filter(
         account__user=user, date__year=year, date__month=month,
         type=Transaction.TYPE_CREDIT, is_transfer=False,
         status=Transaction.STATUS_COMPLETED,
     ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    exp = Transaction.objects.filter(
+    exp_var = Transaction.objects.filter(
         account__user=user, date__year=year, date__month=month,
         type=Transaction.TYPE_DEBIT, is_transfer=False,
         status=Transaction.STATUS_COMPLETED,
@@ -495,29 +508,77 @@ def compute_health_score(user):
     fixos_cur = RecurringTransaction.objects.filter(
         user=user, is_active=True, start_date__lt=next_month_start,
     ).filter(Q(end_date__isnull=True) | Q(end_date__gte=month_start))
-    for r in fixos_cur.filter(type=RecurringTransaction.TYPE_INCOME):
-        inc += _amount_for_month_local(r, month_start)
-    for r in fixos_cur.filter(type=RecurringTransaction.TYPE_EXPENSE):
-        exp += _amount_for_month_local(r, month_start)
+    inc_fix = sum(_amount_for_month_local(r, month_start) for r in fixos_cur.filter(type=RecurringTransaction.TYPE_INCOME))
+    exp_fix = sum(_amount_for_month_local(r, month_start) for r in fixos_cur.filter(type=RecurringTransaction.TYPE_EXPENSE))
+    inc = inc_var + inc_fix
+    exp = exp_var + exp_fix
+    has_var_txs = inc_var > 0 or exp_var > 0
+
+    # How many distinct months (before the current one) had variable transactions
+    var_tx_months_history = Transaction.objects.filter(
+        account__user=user, is_transfer=False,
+        status=Transaction.STATUS_COMPLETED,
+    ).exclude(date__year=year, date__month=month).values("date__year", "date__month").distinct().count()
 
     if inc > 0:
         rate = float((inc - exp) / inc)
-        savings_pts = 25 if rate >= 0.30 else 20 if rate >= 0.20 else 14 if rate >= 0.10 else 8 if rate >= 0 else 0
+        raw_pts = 25 if rate >= 0.30 else 20 if rate >= 0.20 else 14 if rate >= 0.10 else 8 if rate >= 0 else 0
+        if not has_var_txs:
+            # Only fixo-based income — very limited signal
+            savings_pts = min(raw_pts, 8)
+        elif var_tx_months_history == 0:
+            # First month recording real transactions — good start, not full credit yet
+            savings_pts = min(raw_pts, 15)
+        elif var_tx_months_history < 3:
+            # Building track record — unlock most of the score
+            savings_pts = min(raw_pts, 20)
+        else:
+            savings_pts = raw_pts
     else:
         savings_pts = 0
 
     # ── Commitment rate (20pts) ───────────────────────────────────────────────
+    # Requires actual variable expense transactions to score beyond 5pts.
+    # Without real spending data, the ratio is meaningless (all-fixos = 100% ratio).
     fixos_exp_qs = RecurringTransaction.objects.filter(
         user=user, is_active=True, start_date__lt=next_month_start,
         type=RecurringTransaction.TYPE_EXPENSE,
     ).filter(Q(end_date__isnull=True) | Q(end_date__gte=month_start))
     fixos_total = sum(_amount_for_month_local(r, month_start) for r in fixos_exp_qs)
     total_exp = exp + fixos_total
-    if total_exp > 0:
-        cr = float(fixos_total / total_exp)
-        commitment_pts = 20 if cr >= 0.5 else 16 if cr >= 0.3 else 10 if cr >= 0.1 else 4 if cr > 0 else 0
-    else:
+
+    # How many distinct past months had variable expense transactions
+    var_exp_months_history = Transaction.objects.filter(
+        account__user=user, type=Transaction.TYPE_DEBIT, is_transfer=False,
+        status=Transaction.STATUS_COMPLETED,
+    ).exclude(date__year=year, date__month=month).values("date__year", "date__month").distinct().count()
+
+    if total_exp <= 0:
         commitment_pts = 0
+    elif exp_var == 0:
+        # No variable expenses yet — partial credit for having fixos documented
+        commitment_pts = 3 if fixos_total > 0 else 0
+    else:
+        cr = float(fixos_total / total_exp)
+        # Ideal range: 20–70% fixos (balanced predictability)
+        if 0.20 <= cr <= 0.70:
+            raw_comm = 20
+        elif 0.10 <= cr < 0.20 or 0.70 < cr <= 0.80:
+            raw_comm = 14
+        elif 0 < cr < 0.10 or 0.80 < cr <= 0.90:
+            raw_comm = 8
+        elif cr > 0.90:
+            raw_comm = 4  # too locked up in fixed commitments
+        else:
+            raw_comm = 0
+
+        # Gate on historical consistency: ratio only means something with real data over time
+        if var_exp_months_history == 0:
+            commitment_pts = min(raw_comm, 10)
+        elif var_exp_months_history < 3:
+            commitment_pts = min(raw_comm, 15)
+        else:
+            commitment_pts = raw_comm
 
     # ── Goal progress (10pts) ─────────────────────────────────────────────────
     goals = Goal.objects.filter(user=user, is_completed=False)
@@ -539,9 +600,9 @@ def compute_health_score(user):
     cat_pts = int((month_txs.filter(category__isnull=False).count() / total_txs) * 10) if total_txs > 0 else 0
 
     # ── Achievements (20pts) ─────────────────────────────────────────────────
-    # Every ~110 achievement points = 1 health point, capped at 20.
+    # Every ~150 achievement points = 1 health point, capped at 20.
     total_ach = compute_total_points(user)
-    ach_pts = min(20, int(total_ach / 110))
+    ach_pts = min(20, int(total_ach / 150))
 
     score = min(max(setup_pts + savings_pts + commitment_pts + goal_pts + cat_pts + ach_pts, 0), 100)
 
