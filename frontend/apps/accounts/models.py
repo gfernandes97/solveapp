@@ -30,6 +30,8 @@ class UserProfile(models.Model):
     # LGPD — consent tracking
     lgpd_consent_at = models.DateTimeField(null=True, blank=True)
     lgpd_consent_version = models.CharField(max_length=10, blank=True, default="1.0")
+    # Sol tour — mostrado ao primeiro login
+    sol_tour_shown = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -51,6 +51,7 @@ const solState = {
   hasGoals:        {{ sol_has_goals|yesno:"true,false"|default:"false" }},
   hasInvestments:  {{ sol_has_investments|yesno:"true,false"|default:"false" }},
 };
+const solFirstLogin = {{ sol_first_login|yesno:"true,false"|default:"false" }};
 </script>
 
 <div x-data="solTour()" x-init="init()" id="sol-assistant">
@@ -906,11 +907,19 @@ function solTour() {
         this.step = Math.min(this.step + 1, this.steps.length - 1);
         localStorage.setItem('solve_tour_step', this.step);
       }
-      if (!localStorage.getItem('solve_tour_v1')) {
+      if (solFirstLogin) {
+        // Primeiro login do usuário — abre a Sol e marca como exibida no servidor
         setTimeout(function () {
           self.active = true;
           self.$nextTick(function () { self.updateSpotlight(); });
         }, 800);
+        fetch('{% url "sol_mark_shown" %}', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '' },
+        });
+      } else if (!localStorage.getItem('solve_tour_v1')) {
+        // Não é primeiro login mas localStorage foi apagado — não reabre automaticamente
+        // O usuário pode abrir clicando no FAB
       }
     },
 
@@ -1032,7 +1041,8 @@ function solTour() {
         this._actionHandler = function () {
           self.actionClicked = true;
           self._clearRing();
-          self.spotlight = null;
+          self.spotlight    = null;
+          self._spotlightEl = null;
           self._clearActionWatch();
         };
       } else if (s.keepVisible) {
@@ -1065,7 +1075,8 @@ function solTour() {
         this._actionHandler = function () {
           self.actionClicked = true;
           self._clearRing();
-          self.spotlight = null;
+          self.spotlight    = null;
+          self._spotlightEl = null;
           self.flip = false;
         };
       }
@@ -1264,7 +1275,8 @@ function solTour() {
         const clearHandler = function () {
           self.actionClicked = true; /* suprime overlay */
           self._clearRing();
-          self.spotlight = null;
+          self.spotlight    = null;
+          self._spotlightEl = null;
           el.removeEventListener('click', clearHandler, true);
         };
         el.addEventListener('click', clearHandler, true /* capture */);

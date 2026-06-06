@@ -124,9 +124,12 @@ def _proj_date(r, mo):
             while d.weekday() != r.day_of_week:
                 d += timedelta(days=1)
             return d
-    # Monthly / quarterly / semiannual / annual: same day-of-month as start_date
+    # Monthly / quarterly / semiannual / annual
+    # day_of_month overrides start_date.day when explicitly set (supports days 29-31
+    # by clamping to the last day of months that are too short)
+    target_day = r.day_of_month if r.day_of_month is not None else r.start_date.day
     max_day = calendar.monthrange(mo.year, mo.month)[1]
-    return date(mo.year, mo.month, min(r.start_date.day, max_day))
+    return date(mo.year, mo.month, min(target_day, max_day))
 
 
 def _amount_for_month(r, mo):
@@ -1393,6 +1396,8 @@ def fixo_criar(request):
     is_weekly = frequency in (RecurringTransaction.FREQ_WEEKLY, RecurringTransaction.FREQ_BIWEEKLY)
     day_of_week = _iv(request.POST.get("day_of_week")) if is_weekly else None
     day_of_month = _iv(request.POST.get("day_of_month")) if not is_weekly else None
+    if not is_weekly and day_of_month is None:
+        day_of_month = start_date.day
     account_pk = _iv(request.POST.get("account"))
     category_pk = _iv(request.POST.get("category"))
     goal_pk = _iv(request.POST.get("goal"))
@@ -1452,6 +1457,8 @@ def fixo_editar(request, pk):
             rt.day_of_month = None
         else:
             rt.day_of_month = _iv(request.POST.get("day_of_month"))
+            if rt.day_of_month is None:
+                rt.day_of_month = rt.start_date.day
             rt.day_of_week = None
         category_pk = _iv(request.POST.get("category"))
         if category_pk:
@@ -1537,50 +1544,62 @@ def contas(request):
             ach.check_achievements(request.user, request)
         return redirect("contas")
 
-    latest_balance_subq = AccountMonthSnapshot.objects.filter(
-        account=OuterRef("pk")
-    ).order_by("-month").values("balance")[:1]
-
-    latest_month_subq = AccountMonthSnapshot.objects.filter(
-        account=OuterRef("pk")
-    ).order_by("-month").values("month")[:1]
-
     all_accounts = list(
         Account.objects.filter(user=request.user, is_active=True)
-        .annotate(
-            latest_balance=Subquery(latest_balance_subq),
-            latest_month=Subquery(latest_month_subq),
-        )
         .order_by("type", "name")
-        .prefetch_related(
-            Prefetch("monthly_snapshots", queryset=AccountMonthSnapshot.objects.order_by("-month"))
-        )
     )
 
-    # snap_count via prefetch cache (sem query extra)
-    for acc in all_accounts:
-        acc.snap_count = len(list(acc.monthly_snapshots.all()))
-
-    cash_accounts = [a for a in all_accounts if a.type in (Account.TYPE_CHECKING, Account.TYPE_SAVINGS, Account.TYPE_WALLET)]
-    credit_accounts = [a for a in all_accounts if a.type == Account.TYPE_CREDIT]
+    cash_accounts       = [a for a in all_accounts if a.type in (Account.TYPE_CHECKING, Account.TYPE_SAVINGS, Account.TYPE_WALLET)]
+    credit_accounts     = [a for a in all_accounts if a.type == Account.TYPE_CREDIT]
     investment_accounts = [a for a in all_accounts if a.type == Account.TYPE_INVESTMENT]
 
+    # ── Matrix: months × accounts ─────────────────────────────────────────────
+    all_snaps = AccountMonthSnapshot.objects.filter(
+        account__user=request.user, account__is_active=True
+    ).select_related("account")
+
+    snap_months = {s.month.replace(day=1) for s in all_snaps}
+
+    # Last 12 months always visible
+    today = _now_br().date().replace(day=1)
+    recent: set = set()
+    m = today
+    for _ in range(12):
+        recent.add(m)
+        m = date(m.year - 1, 12, 1) if m.month == 1 else date(m.year, m.month - 1, 1)
+
+    months = sorted(snap_months | recent)  # oldest → newest (left → right)
+
+    # {account_id: {month_str: {balance, snap_id}}}
+    matrix: dict = {a.pk: {} for a in all_accounts}
+    for s in all_snaps:
+        mo_str = s.month.strftime("%Y-%m")
+        matrix.setdefault(s.account_id, {})[mo_str] = {
+            "b":  float(s.balance),
+            "id": s.pk,
+        }
+
+    matrix_json = json.dumps(matrix, ensure_ascii=False)
+    months_list = [(m.strftime("%Y-%m"), m.strftime("%b/%Y")) for m in months]
+
     total_balance = sum(
-        (acc.latest_balance for acc in all_accounts
-         if acc.latest_balance is not None
-         and acc.is_active
-         and acc.include_in_total
-         and acc.type != Account.TYPE_CREDIT),
+        (Decimal(str(matrix[a.pk][months[-1].strftime("%Y-%m")]["b"]))
+         for a in all_accounts
+         if a.include_in_total and a.type != Account.TYPE_CREDIT
+         and months and months[-1].strftime("%Y-%m") in matrix.get(a.pk, {})),
         Decimal("0"),
-    )
+    ) if months else Decimal("0")
 
     return render(request, "dashboard/contas.html", {
-        "cash_accounts": cash_accounts,
-        "credit_accounts": credit_accounts,
-        "investment_accounts": investment_accounts,
-        "has_accounts": bool(all_accounts),
-        "total_balance": total_balance,
-        "account_types": Account.TYPE_CHOICES,
+        "cash_accounts":        cash_accounts,
+        "credit_accounts":      credit_accounts,
+        "investment_accounts":  investment_accounts,
+        "all_accounts":         all_accounts,
+        "has_accounts":         bool(all_accounts),
+        "total_balance":        total_balance,
+        "account_types":        Account.TYPE_CHOICES,
+        "months_list":          months_list,
+        "matrix_json":          matrix_json,
     })
 
 
@@ -1623,6 +1642,44 @@ def snapshot_excluir(request, pk):
     snap.delete()
     ach.check_achievements(request.user, request)
     return redirect("contas")
+
+
+@login_required
+@require_POST
+def snapshot_ajax(request):
+    """Inline-edit endpoint para a view matricial de contas. Retorna JSON."""
+    from django.http import JsonResponse
+    account_pk = _iv(request.POST.get("account"))
+    month_str  = request.POST.get("month", "").strip()
+    balance_str = request.POST.get("balance", "").strip().replace(",", ".")
+
+    if not account_pk or not month_str:
+        return JsonResponse({"error": "missing"}, status=400)
+
+    try:
+        year_s, mo_s = month_str.split("-")
+        mo  = date(int(year_s), int(mo_s), 1)
+        acc = Account.objects.get(pk=account_pk, user=request.user)
+    except (ValueError, Account.DoesNotExist):
+        return JsonResponse({"error": "invalid"}, status=400)
+
+    if not balance_str:
+        # Célula apagada — remove o snapshot se existir
+        deleted = AccountMonthSnapshot.objects.filter(account=acc, month=mo).delete()[0]
+        if deleted:
+            ach.check_achievements(request.user, request)
+        return JsonResponse({"deleted": True})
+
+    try:
+        balance = Decimal(balance_str)
+    except Exception:
+        return JsonResponse({"error": "invalid_balance"}, status=400)
+
+    snap, _ = AccountMonthSnapshot.objects.update_or_create(
+        account=acc, month=mo, defaults={"balance": balance}
+    )
+    ach.check_achievements(request.user, request)
+    return JsonResponse({"ok": True, "snap_id": snap.pk, "balance": float(balance)})
 
 
 @login_required
@@ -2938,4 +2995,19 @@ def settings_update(request):
 
     messages.success(request, "Dados atualizados com sucesso.")
     return redirect("settings")
+
+
+@login_required
+@require_POST
+def sol_mark_shown(request):
+    """Marca o tour da Sol como exibido para este usuário (chamado pelo JS no primeiro login)."""
+    from django.http import JsonResponse
+    try:
+        profile = request.user.profile
+        if not profile.sol_tour_shown:
+            profile.sol_tour_shown = True
+            profile.save(update_fields=["sol_tour_shown"])
+    except Exception:
+        pass
+    return JsonResponse({"ok": True})
 

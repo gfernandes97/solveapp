@@ -672,8 +672,9 @@
         </div>
         <div id="fixo-day-month-wrap" class="hidden">
           <label class="block text-xs font-semibold text-smoke">Dia do mês</label>
-          <input type="number" name="day_of_month" min="1" max="28" placeholder="Ex: 5"
+          <input type="number" id="fixo-day-month" name="day_of_month" min="1" max="31" placeholder="Ex: 5"
                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <p class="mt-1 text-xs text-smoke">Meses com menos dias usam o último dia do mês.</p>
         </div>
       </div>
       <div>
@@ -713,7 +714,7 @@
           <label class="block text-xs font-semibold text-smoke">
             Data de início <span class="text-red-400">*</span>
           </label>
-          <input type="date" name="start_date" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <input type="date" id="fixo-start-date" name="start_date" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
         </div>
         <div>
           <label class="block text-xs font-semibold text-smoke">
@@ -787,8 +788,9 @@
         </div>
         <div id="edit-fixo-day-month-wrap" class="hidden">
           <label class="block text-xs font-semibold text-smoke">Dia do mês</label>
-          <input type="number" id="edit-fixo-day-month" name="day_of_month" min="1" max="28"
+          <input type="number" id="edit-fixo-day-month" name="day_of_month" min="1" max="31"
                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <p class="mt-1 text-xs text-smoke">Meses com menos dias usam o último dia do mês.</p>
         </div>
       </div>
       <div>
@@ -1033,6 +1035,16 @@ function updateDayField() {
 // init on page load
 document.addEventListener('DOMContentLoaded', function() {
   updateDayField();
+  // Auto-fill day_of_month from start_date when user picks a date
+  var startDateInput = document.getElementById('fixo-start-date');
+  var dayMonthInput  = document.getElementById('fixo-day-month');
+  if (startDateInput && dayMonthInput) {
+    startDateInput.addEventListener('change', function() {
+      if (this.value && !dayMonthInput.value) {
+        dayMonthInput.value = parseInt(this.value.split('-')[2], 10);
+      }
+    });
+  }
 });
 
 function updateEditDayField() {
@@ -1060,7 +1072,9 @@ function openEditFixo(pk, name, amount, type, frequency, startDate, accountPk, d
   if (frequency === 'weekly' || frequency === 'biweekly') {
     document.getElementById('edit-fixo-day-week').value = dayWeek || '0';
   } else {
-    document.getElementById('edit-fixo-day-month').value = dayMonth || '';
+    // If day_of_month was not stored, default from start_date day
+    var _day = dayMonth || (startDate ? parseInt(startDate.split('-')[2], 10) : '');
+    document.getElementById('edit-fixo-day-month').value = _day || '';
   }
   document.getElementById('modal-editar-fixo').classList.remove('hidden');
 }

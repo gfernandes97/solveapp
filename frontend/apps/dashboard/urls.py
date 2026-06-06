@@ -32,6 +32,7 @@ urlpatterns = [
     path("contas/<int:pk>/editar/", views.conta_editar, name="conta_editar"),
     path("contas/<int:pk>/excluir/", views.conta_excluir, name="conta_excluir"),
     path("contas/snapshot/", views.snapshot_criar, name="snapshot_criar"),
+    path("contas/snapshot/ajax/", views.snapshot_ajax, name="snapshot_ajax"),
     path("contas/snapshot/<int:pk>/excluir/", views.snapshot_excluir, name="snapshot_excluir"),
 
     # Metas
@@ -53,4 +54,7 @@ urlpatterns = [
     # Configurações
     path("settings/", views.settings, name="settings"),
     path("settings/update/", views.settings_update, name="settings_update"),
+
+    # Sol tour
+    path("sol/mark-shown/", views.sol_mark_shown, name="sol_mark_shown"),
 ]

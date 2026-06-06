@@ -25,8 +25,14 @@ def sol_state(request):
         Account, AccountMonthSnapshot, Goal, Investment, InvestmentTransaction,
         RecurringTransaction, Transaction,
     )
+    from apps.accounts.models import UserProfile
     user = request.user
+    try:
+        sol_first_login = not user.profile.sol_tour_shown
+    except UserProfile.DoesNotExist:
+        sol_first_login = True
     return {
+        "sol_first_login":      sol_first_login,
         "sol_has_accounts":     Account.objects.filter(user=user, is_active=True).exists(),
         "sol_has_snapshots":    _all_accounts_have_snapshot(user, Account, AccountMonthSnapshot),
         "sol_has_transactions": Transaction.objects.filter(account__user=user, is_transfer=False).exists(),
