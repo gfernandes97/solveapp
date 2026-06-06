@@ -27,6 +27,18 @@ Sol — Assistente Virtual Solve
   border-radius: 10px;
   animation: sol-cat-pulse 1.8s ease-in-out infinite !important;
 }
+/* Sidebar nav links: outline branco pulsante + fundo claro para contraste sobre fundo escuro */
+@keyframes sol-sidebar-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.5); }
+  50%       { box-shadow: 0 0 0 10px rgba(255,255,255,0); }
+}
+.sol-sidebar-ring {
+  background-color: rgba(255,255,255,0.16) !important;
+  outline: 2.5px solid rgba(255,255,255,0.92) !important;
+  outline-offset: 5px !important;
+  border-radius: 10px;
+  animation: sol-sidebar-pulse 1.5s ease-in-out infinite !important;
+}
 </style>
 
 <!-- Estado do usuário injetado pelo context processor -->
@@ -470,6 +482,7 @@ function solTour() {
     _drillRowEl: null,
     _blockAutoScroll: false,
     _catEls: [],
+    _modalAutoNextObs: null,
 
     /* ── FAB drag ── */
     _fabBottom:     parseInt(localStorage.getItem('sol_fab_bottom') || '20'),
@@ -514,10 +527,28 @@ function solTour() {
 
     /* ── Definição dos steps ───────────────────────────────────────── */
     steps: [
-      /* 0 – Boas-vindas */
+      /* 0 – Introdução: Score de Saúde */
       {
-        msgFn: () => `Oi! Eu sou a <strong>Sol</strong> ☀️<br><br>Sua guia aqui no Solve. Deixa eu te mostrar como colocar suas finanças no controle — são só alguns minutos.`,
-        nextLabel: 'Vamos lá!',
+        urlDone: () => { const p = window.location.pathname.replace(/\/$/, ''); return p === '/dashboard' || p === ''; },
+        autoNavigate: '/dashboard/',
+        msgFn: (done) => done
+          ? `Este é o seu <strong>Score de Saúde Financeira</strong> 📊<br><br>Vai de <strong>0 a 100 pontos</strong>, calculado por 6 componentes:<br><br>🔧 <strong>Configuração</strong> — 15pts<br>💰 <strong>Taxa de poupança</strong> — 25pts<br>🔁 <strong>Controle de fixos</strong> — 20pts<br>🎯 <strong>Metas</strong> — 10pts<br>🏷️ <strong>Categorização</strong> — 10pts<br>🏆 <strong>Conquistas</strong> — 20pts<br><br>O tour vai te ensinar como maximizar cada um!`
+          : `Oi! Eu sou a <strong>Sol</strong> ☀️ — sua guia no Solve.<br><br>Vou te mostrar como tirar o máximo do Solve em poucos passos. Primeiro, deixa eu te apresentar os dois instrumentos principais.<br><br>👉 Clique em <strong>Visão Geral</strong> no menu.`,
+        targetFn: (path, done) => {
+          if (!done) return '[data-tour="dashboard"]';
+          return '[data-tour-section="health-score"]';
+        },
+        nextLabel: 'Próximo →',
+      },
+      /* 0b – Conquistas */
+      {
+        substep: true,
+        msgFn: () => `🏆 <strong>Conquistas</strong><br><br>Conforme você forma hábitos financeiros consistentes — registrar lançamentos, manter saldo atualizado, atingir metas — você desbloqueia <strong>medalhas</strong>.<br><br>Cada conquista tem <strong>4 níveis</strong>:<br>🥉 Bronze → 🥈 Prata → 🥇 Ouro → 💎 Platina<br><br>Cada nível contribui com pontos para o <strong>Score de Saúde</strong> (até 20 pts no total). Quanto mais consistente o hábito, mais alto o nível.`,
+        targetFn: (path) => {
+          const p = path.replace(/\/$/, '');
+          return (p === '/dashboard' || p === '') ? '[data-tour-section="conquistas"]' : '[data-tour="dashboard"]';
+        },
+        nextLabel: 'Ótimo, vamos começar!',
       },
       /* 1 – Contas: criar */
       {
@@ -554,6 +585,9 @@ function solTour() {
       {
         substep: true,
         isDone: () => false,
+        keepVisible: true,
+        watchModal: 'modal-goal-drill',
+        autoNextOnModalClose: true,
         msgFn: () => `🎯 <strong>Acompanhe cada meta de perto</strong><br><br>Clique em qualquer <strong>card de meta</strong> para ver o histórico de aportes vinculados a ela, o progresso real e os lançamentos registrados.<br><br>👆 Experimente clicar no card ao lado.`,
         targetFn: (path) => {
           if (!path.startsWith('/dashboard/metas')) return '[data-tour="metas"]';
@@ -563,7 +597,6 @@ function solTour() {
       /* 3 – Saldo patrimonial */
       {
         isDone: (s) => s.hasSnapshots,
-        autoAdvanceIfDone: true,
         msgFn: (done) => done
           ? `Perfeito! Todas as contas têm 2 meses de saldo registrado. O Solve já consegue medir a variação do seu patrimônio! 📸`
           : `Registre o <strong>saldo patrimonial</strong> de <strong>cada conta em pelo menos 2 meses</strong> diferentes.<br><br>💡 Use o mês atual e um anterior que você conheça — isso permite ao Solve calcular a <strong>variação do patrimônio</strong> ao longo do tempo. Use as <strong>mesmas datas</strong> em todas as contas.<br><br>👉 Clique em <strong>Atualizar patrimônio</strong> em cada conta.`,
@@ -883,6 +916,7 @@ function solTour() {
 
     next() {
       this._clearActionWatch();
+      this._clearModalAutoNext();
       if (this.step < this.steps.length - 1) {
         this.step++;
         this.actionClicked = false;
@@ -915,6 +949,7 @@ function solTour() {
 
     prev() {
       this._clearActionWatch();
+      this._clearModalAutoNext();
       if (this.step > 0) {
         this.step--;
         this.actionClicked = false;
@@ -943,6 +978,7 @@ function solTour() {
 
     finish() {
       this._clearActionWatch();
+      this._clearModalAutoNext();
       localStorage.setItem('solve_tour_v1', 'done');
       localStorage.removeItem('solve_tour_step');
       this._clearRing();
@@ -960,6 +996,7 @@ function solTour() {
 
     restart() {
       this._clearActionWatch();
+      this._clearModalAutoNext();
       localStorage.removeItem('solve_tour_v1');
       localStorage.removeItem('solve_tour_step');
       this.step             = 0;
@@ -999,10 +1036,9 @@ function solTour() {
           self._clearActionWatch();
         };
       } else if (s.keepVisible) {
-        /* keepVisible: limpa ring/spotlight mas NÃO seta actionClicked — Sol permanece visível
-           e actionPending=true até isDone ser satisfeito (ex: meta cadastrada).
-           Limpa _spotlightEl para que o listener de scroll não re-ative o spotlight acidentalmente.
-           Se o step tem watchModal, observa o modal: quando ele fecha sem salvar, restaura o spotlight. */
+        /* keepVisible: limpa ring/spotlight mas NÃO seta actionClicked — Sol permanece visível.
+           Se autoNextOnModalClose=true: avança para o próximo passo ao fechar o modal.
+           Caso contrário: restaura o spotlight quando o modal fecha sem salvar. */
         this._actionHandler = function () {
           self._clearRing();
           self.spotlight    = null;
@@ -1013,7 +1049,10 @@ function solTour() {
               const obs = new MutationObserver(function () {
                 if (modalEl.classList.contains('hidden')) {
                   obs.disconnect();
-                  if (!self._stepDone(self.steps[self.step])) {
+                  if (s.autoNextOnModalClose) {
+                    self._clearModalAutoNext();
+                    self.next();
+                  } else if (!self._stepDone(self.steps[self.step])) {
                     self.$nextTick(function () { self.updateSpotlight(); });
                   }
                 }
@@ -1114,10 +1153,11 @@ function solTour() {
       }
     },
 
-    /* ── Ring pulsante no botão de ação ── */
+    /* ── Ring pulsante (ação ou sidebar) ── */
     _clearRing() {
       if (this._ringEl) {
         this._ringEl.classList.remove('sol-action-ring');
+        this._ringEl.classList.remove('sol-sidebar-ring');
         this._ringEl = null;
       }
     },
@@ -1185,7 +1225,9 @@ function solTour() {
         return;
       }
 
-      const pad = 10;
+      /* Sidebar nav links: pad maior + fundo claro. Action buttons: pad normal + ring verde. */
+      const isSidebarLink = sel.includes('[data-tour="');
+      const pad = isSidebarLink ? 18 : 10;
       this.spotlight    = {
         top:    rect.top    - pad,
         left:   rect.left   - pad,
@@ -1194,8 +1236,11 @@ function solTour() {
       };
       this._spotlightEl = el; /* garante referência para o scroll listener */
 
-      /* Ring pulsante apenas em botões de ação (não links de sidebar) */
-      if (sel.includes('data-tour-action')) {
+      /* Ring visual: branco pulsante para links de sidebar, verde para botões de ação */
+      if (isSidebarLink) {
+        el.classList.add('sol-sidebar-ring');
+        this._ringEl = el;
+      } else if (sel.includes('data-tour-action')) {
         el.classList.add('sol-action-ring');
         this._ringEl = el;
       }
@@ -1236,8 +1281,36 @@ function solTour() {
       this.flip = (sp.left < solR && (sp.left + sp.width) > solL &&
                    sp.top  < solBottom && (sp.top + sp.height) > solTop);
 
+      /* autoNextOnModalClose: configura observer global apenas quando o step NÃO usa keepVisible.
+         Se keepVisible=true, o observer é criado no handler do clique (_watchAction) para evitar
+         que os dois observers chamem next() em paralelo ao fechar o modal (double-advance). */
+      if (s.watchModal && s.autoNextOnModalClose && !s.keepVisible && !this._modalAutoNextObs) {
+        const _mel = document.getElementById(s.watchModal);
+        if (_mel) {
+          let _wasOpen = !_mel.classList.contains('hidden');
+          const _self = this;
+          this._modalAutoNextObs = new MutationObserver(function () {
+            const _hidden = _mel.classList.contains('hidden');
+            if (!_hidden) {
+              _wasOpen = true;
+            } else if (_wasOpen && _self._modalAutoNextObs) {
+              _self._clearModalAutoNext();
+              _self.next();
+            }
+          });
+          this._modalAutoNextObs.observe(_mel, { attributes: true, attributeFilter: ['class'] });
+        }
+      }
+
       /* Inicia observador de clique no botão de ação */
       this._watchAction();
+    },
+
+    _clearModalAutoNext() {
+      if (this._modalAutoNextObs) {
+        this._modalAutoNextObs.disconnect();
+        this._modalAutoNextObs = null;
+      }
     },
   };
 }

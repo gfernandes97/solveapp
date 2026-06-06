@@ -1521,7 +1521,7 @@ def categoria_excluir(request, pk):
 def contas(request):
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
-        if name:
+        if name and not Account.objects.filter(user=request.user, name__iexact=name).exists():
             acc_type = request.POST.get("type", Account.TYPE_CHECKING)
             Account.objects.create(
                 user=request.user,
@@ -1546,7 +1546,7 @@ def contas(request):
     ).order_by("-month").values("month")[:1]
 
     all_accounts = list(
-        Account.objects.filter(user=request.user)
+        Account.objects.filter(user=request.user, is_active=True)
         .annotate(
             latest_balance=Subquery(latest_balance_subq),
             latest_month=Subquery(latest_month_subq),
