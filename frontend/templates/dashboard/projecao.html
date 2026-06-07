@@ -168,9 +168,25 @@
             dos lançamentos
           </span>
         </p>
-        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div class="grid grid-cols-1 gap-2 {% if issue.is_credit %}sm:grid-cols-1{% else %}sm:grid-cols-3{% endif %}">
           {% if issue.batimento_diff > 0 %}
 
+          {% if issue.is_credit %}
+          <!-- Cartão de crédito: sugerir pagamento via transferência de custódia -->
+          <button type="button"
+                  onclick="openPagarFaturaModal('{{ issue.batimento_abs_str }}','{{ row.month|date:'Y-m-d' }}',{{ issue.account_id }})"
+                  class="group flex items-start gap-3 rounded-xl border-2 border-obsidian/30 bg-white p-4 text-left shadow transition-all hover:border-obsidian hover:bg-obsidian/5 hover:shadow-md">
+            <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-obsidian/10 text-obsidian transition-colors group-hover:bg-obsidian group-hover:text-white">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+            </span>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-obsidian">Pagar fatura</p>
+              <p class="mt-0.5 text-lg font-black text-obsidian">{{ issue.batimento_abs|brl }}</p>
+              <p class="mt-0.5 text-xs text-smoke">Transferência de custódia para o cartão</p>
+            </div>
+          </button>
+
+          {% else %}
           <!-- 1 · Receita variável -->
           <button type="button"
                   onclick="openAjusteModal('credit','{{ issue.batimento_abs_str }}',{{ row.month|date:'Y' }},{{ row.month|date:'n' }},'{{ row.label|escapejs }}',{{ issue.account_id }})"
@@ -212,6 +228,7 @@
               <p class="mt-0.5 text-xs text-smoke">Resgate ou desinvestimento</p>
             </div>
           </button>
+          {% endif %}
 
           {% else %}
 
@@ -558,6 +575,58 @@
 </div>
 
 <!-- ─── Modal: Registrar ajuste de batimento ─── -->
+<!-- ─── Modal: Pagar Fatura (cartão de crédito) ─── -->
+<div id="modal-pagar-fatura" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-black text-obsidian">Pagar fatura</h2>
+        <p class="mt-0.5 text-xs text-smoke">Transferência de custódia para o cartão</p>
+      </div>
+      <button onclick="document.getElementById('modal-pagar-fatura').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'transferencia_criar' %}" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="redirect_to" value="projecao">
+      <input type="hidden" id="fatura-to-account" name="to_account" value="">
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Custódia de origem *</label>
+        <select id="fatura-from-account" name="from_account" required
+                class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-obsidian focus:outline-none focus:ring-1 focus:ring-obsidian">
+          {% for acc in cash_accounts %}
+          <option value="{{ acc.id }}">{{ acc.name }}{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Valor (R$) *</label>
+          <input type="number" id="fatura-amount" name="amount" step="0.01" min="0.01" required
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-obsidian focus:outline-none focus:ring-1 focus:ring-obsidian">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-smoke">Data *</label>
+          <input type="date" id="fatura-date" name="date" required
+                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-obsidian focus:outline-none focus:ring-1 focus:ring-obsidian">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Descrição</label>
+        <input type="text" id="fatura-description" name="description"
+               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-obsidian focus:outline-none focus:ring-1 focus:ring-obsidian">
+      </div>
+      <p class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-smoke">
+        A transferência será registrada como débito na custódia e crédito no cartão, fechando o batimento automaticamente.
+      </p>
+      <button type="submit" class="w-full rounded-lg bg-obsidian py-3 text-sm font-black text-white transition-colors hover:bg-obsidian/90">
+        Registrar pagamento
+      </button>
+    </form>
+  </div>
+</div>
+
 <div id="modal-ajuste" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
   <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
     <div class="flex items-center justify-between">
@@ -660,6 +729,17 @@ function closeAjusteModal() {
 // Close on backdrop click
 document.getElementById('modal-ajuste').addEventListener('click', function(e) {
   if (e.target === this) closeAjusteModal();
+});
+
+function openPagarFaturaModal(amount, dateStr, creditAccId) {
+  document.getElementById('fatura-amount').value = amount;
+  document.getElementById('fatura-date').value = dateStr;
+  document.getElementById('fatura-to-account').value = creditAccId;
+  document.getElementById('fatura-description').value = 'Pagamento de fatura';
+  document.getElementById('modal-pagar-fatura').classList.remove('hidden');
+}
+document.getElementById('modal-pagar-fatura').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.add('hidden');
 });
 
 function toggleDrill(n) {

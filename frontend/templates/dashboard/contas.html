@@ -70,7 +70,7 @@
                   <p class="text-[11px] text-smoke">{{ acc.get_type_display }}{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</p>
                 </div>
                 <div class="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }})"
+                  <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }},'{{ acc.credit_limit|default:'' }}','{{ acc.closing_day|default:'' }}','{{ acc.due_day|default:'' }}')"
                           class="rounded p-1 text-smoke/60 hover:bg-slate-200 hover:text-obsidian transition-colors">
                     <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                   </button>
@@ -110,7 +110,7 @@
                   <p class="text-[11px] text-smoke">Crédito{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</p>
                 </div>
                 <div class="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }})"
+                  <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }},'{{ acc.credit_limit|default:'' }}','{{ acc.closing_day|default:'' }}','{{ acc.due_day|default:'' }}')"
                           class="rounded p-1 text-smoke/60 hover:bg-slate-200 hover:text-obsidian transition-colors">
                     <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                   </button>
@@ -150,7 +150,7 @@
                   <p class="text-[11px] text-smoke">Investimentos{% if acc.bank_name %} · {{ acc.bank_name }}{% endif %}</p>
                 </div>
                 <div class="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }})"
+                  <button onclick="openEditConta({{ acc.id }},'{{ acc.name|escapejs }}','{{ acc.type }}','{{ acc.bank_name|escapejs }}','{{ acc.color }}',{{ acc.include_in_total|yesno:'true,false' }},{{ acc.is_active|yesno:'true,false' }},'{{ acc.credit_limit|default:'' }}','{{ acc.closing_day|default:'' }}','{{ acc.due_day|default:'' }}')"
                           class="rounded p-1 text-smoke/60 hover:bg-slate-200 hover:text-obsidian transition-colors">
                     <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                   </button>
@@ -308,17 +308,17 @@
       <div id="ec-credit-fields" class="hidden grid grid-cols-3 gap-3">
         <div>
           <label class="block text-xs font-semibold text-smoke">Limite (R$)</label>
-          <input type="number" name="credit_limit" step="0.01"
+          <input type="number" id="ec-limit" name="credit_limit" step="0.01"
                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
         </div>
         <div>
           <label class="block text-xs font-semibold text-smoke">Fecha dia</label>
-          <input type="number" name="closing_day" min="1" max="31"
+          <input type="number" id="ec-closing" name="closing_day" min="1" max="31"
                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
         </div>
         <div>
           <label class="block text-xs font-semibold text-smoke">Vence dia</label>
-          <input type="number" name="due_day" min="1" max="31"
+          <input type="number" id="ec-due" name="due_day" min="1" max="31"
                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
         </div>
       </div>
@@ -395,9 +395,24 @@
   const fmtBRL = v => 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
   // ── Render cells ────────────────────────────────────────────────────────────
+  const CREDIT_IDS = new Set([{% for a in credit_accounts %}{{ a.pk }},{% endfor %}]);
+
   document.querySelectorAll('.matrix-cell').forEach(function (td) {
     const accId  = td.dataset.account;
     const moStr  = td.dataset.month;
+
+    // Credit cards always show R$ 0,00 and are not editable
+    if (CREDIT_IDS.has(Number(accId))) {
+      const display = document.createElement('div');
+      display.className = 'cell-display';
+      display.style.color = '#CBD5E1';
+      display.style.fontWeight = '400';
+      display.textContent = 'R$ 0,00';
+      td.appendChild(display);
+      td.style.cursor = 'default';
+      return;
+    }
+
     const snap   = (MATRIX[accId] || {})[moStr];
 
     const display  = document.createElement('div');
@@ -521,15 +536,18 @@
     document.getElementById(id).classList.toggle('hidden', type !== 'credit');
   };
 
-  window.openEditConta = function (id, name, type, bank, color, includeInTotal, isActive) {
+  window.openEditConta = function (id, name, type, bank, color, includeInTotal, isActive, creditLimit, closingDay, dueDay) {
     const form = document.getElementById('edit-conta-form');
     form.action = '/dashboard/contas/' + id + '/editar/';
-    document.getElementById('ec-name').value    = name;
-    document.getElementById('ec-type').value    = type;
-    document.getElementById('ec-bank').value    = bank;
-    document.getElementById('ec-color').value   = color;
+    document.getElementById('ec-name').value      = name;
+    document.getElementById('ec-type').value      = type;
+    document.getElementById('ec-bank').value      = bank;
+    document.getElementById('ec-color').value     = color;
     document.getElementById('ec-include').checked = includeInTotal;
     document.getElementById('ec-active').checked  = isActive;
+    document.getElementById('ec-limit').value     = creditLimit   || '';
+    document.getElementById('ec-closing').value   = closingDay    || '';
+    document.getElementById('ec-due').value       = dueDay        || '';
     toggleCreditFields('ec-credit-fields', type);
     openModal('modal-editar-conta');
   };

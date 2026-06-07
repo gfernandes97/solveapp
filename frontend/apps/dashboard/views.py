@@ -1509,6 +1509,8 @@ def transferencia_criar(request):
     to_acc.balance += amount
     to_acc.save(update_fields=["balance"])
 
+    if request.POST.get("redirect_to") == "projecao":
+        return redirect("projecao")
     return redirect(f"/dashboard/lancamentos/?ano={tx_date.year}&mes={tx_date.month}&tab=todos")
 
 
@@ -1664,20 +1666,26 @@ def categoria_excluir(request, pk):
 def contas(request):
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
-        if name and not Account.objects.filter(user=request.user, name__iexact=name).exists():
-            acc_type = request.POST.get("type", Account.TYPE_CHECKING)
-            Account.objects.create(
-                user=request.user,
-                name=name,
-                type=acc_type,
-                bank_name=request.POST.get("bank_name", "").strip(),
-                color=request.POST.get("color", "#00C97A"),
-                include_in_total="include_in_total" in request.POST,
-                credit_limit=_d(request.POST.get("credit_limit")) if acc_type == Account.TYPE_CREDIT else None,
-                closing_day=_iv(request.POST.get("closing_day")),
-                due_day=_iv(request.POST.get("due_day")),
-            )
-            ach.check_achievements(request.user, request)
+        if name:
+            if Account.objects.filter(user=request.user, name__iexact=name, is_active=True).exists():
+                messages.warning(
+                    request,
+                    f"Já existe uma conta com o nome \"{name}\". Escolha um nome diferente.",
+                )
+            else:
+                acc_type = request.POST.get("type", Account.TYPE_CHECKING)
+                Account.objects.create(
+                    user=request.user,
+                    name=name,
+                    type=acc_type,
+                    bank_name=request.POST.get("bank_name", "").strip(),
+                    color=request.POST.get("color", "#00C97A"),
+                    include_in_total="include_in_total" in request.POST,
+                    credit_limit=_d(request.POST.get("credit_limit")) if acc_type == Account.TYPE_CREDIT else None,
+                    closing_day=_iv(request.POST.get("closing_day")),
+                    due_day=_iv(request.POST.get("due_day")),
+                )
+                ach.check_achievements(request.user, request)
         return redirect("contas")
 
     all_accounts = list(
@@ -1714,6 +1722,12 @@ def contas(request):
             "b":  float(s.balance),
             "id": s.pk,
         }
+
+    # Credit accounts carry no patrimonial value — show 0 for every month
+    _credit_ids = {a.pk for a in credit_accounts}
+    for _cid in _credit_ids:
+        for _mo_str in matrix.get(_cid, {}):
+            matrix[_cid][_mo_str]["b"] = 0.0
 
     matrix_json = json.dumps(matrix, ensure_ascii=False)
     months_list = [(m.strftime("%Y-%m"), f"{_MONTHS[m.month - 1][:3].capitalize()}/{m.year}") for m in months]
@@ -1824,18 +1838,30 @@ def conta_editar(request, pk):
     acc = _own_account(request.user, pk)
     name = request.POST.get("name", "").strip()
     if name:
-        acc.name = name
-        acc.type = request.POST.get("type", acc.type)
-        acc.bank_name = request.POST.get("bank_name", "").strip()
-        acc.color = request.POST.get("color", acc.color)
-        acc.include_in_total = "include_in_total" in request.POST
-        acc.is_active = "is_active" in request.POST
-        if acc.type == Account.TYPE_CREDIT:
-            cl = request.POST.get("credit_limit", "").strip()
-            acc.credit_limit = _d(cl) if cl else acc.credit_limit
-            acc.closing_day = _iv(request.POST.get("closing_day")) or acc.closing_day
-            acc.due_day = _iv(request.POST.get("due_day")) or acc.due_day
-        acc.save()
+        duplicate = (
+            Account.objects
+            .filter(user=request.user, name__iexact=name, is_active=True)
+            .exclude(pk=acc.pk)
+            .exists()
+        )
+        if duplicate:
+            messages.warning(
+                request,
+                f"Já existe outra conta com o nome \"{name}\". A edição não foi salva.",
+            )
+        else:
+            acc.name = name
+            acc.type = request.POST.get("type", acc.type)
+            acc.bank_name = request.POST.get("bank_name", "").strip()
+            acc.color = request.POST.get("color", acc.color)
+            acc.include_in_total = "include_in_total" in request.POST
+            acc.is_active = "is_active" in request.POST
+            if acc.type == Account.TYPE_CREDIT:
+                cl = request.POST.get("credit_limit", "").strip()
+                acc.credit_limit = _d(cl) if cl else acc.credit_limit
+                acc.closing_day = _iv(request.POST.get("closing_day")) or acc.closing_day
+                acc.due_day = _iv(request.POST.get("due_day")) or acc.due_day
+            acc.save()
     return redirect("contas")
 
 
@@ -2630,14 +2656,22 @@ def projecao(request):
         key = (mo, row["type"], row["is_recurring"])
         actual[key] = actual.get(key, Decimal("0")) + (row["total"] or Decimal("0"))
 
-    # Per-account net transactions for cash accounts (credit − debit per account per month).
-    # Uses the same tx_query_start window as `raw`, so tx_query_start is already defined above.
+    # Pre-fetch credit card account IDs so the loops below can treat them differently
+    # (no snapshot anchor — every month is fair game for batimento).
+    _credit_acc_ids: set = set(
+        Account.objects.filter(
+            user=request.user, is_active=True, type=Account.TYPE_CREDIT
+        ).values_list("pk", flat=True)
+    )
+
+    # Per-account net transactions — custody + credit card accounts.
+    # Credit cards have no snapshots so they are handled without an anchor guard.
     per_acc_tx_raw = (
         Transaction.objects.filter(
             account__user=request.user,
             account__is_active=True,
             account__include_in_total=True,
-            account__type__in=_CUSTODY_TYPES,
+            account__type__in=_CUSTODY_TYPES + [Account.TYPE_CREDIT],
             status=Transaction.STATUS_COMPLETED,
             date__gte=tx_query_start,
             date__lt=_add_months(end_month, 1),
@@ -2653,7 +2687,10 @@ def projecao(request):
         _mo = (_row["mo"] if isinstance(_row["mo"], date) else _row["mo"].date()).replace(day=1)
         _aid = _row["account_id"]
         _first = acc_first_snap.get(_aid)
-        if _first is None or _mo <= _first:
+        # Credit cards have no snapshot — include all months; custody accounts require snapshot anchor
+        if _aid in _credit_acc_ids:
+            pass  # always include
+        elif _first is None or _mo <= _first:
             continue
         _delta = _row["total"] or Decimal("0")
         _key = (_aid, _mo)
@@ -2741,7 +2778,7 @@ def projecao(request):
             account__user=request.user,
             account__is_active=True,
             account__include_in_total=True,
-            account__type__in=_CUSTODY_TYPES,
+            account__type__in=_CUSTODY_TYPES + [Account.TYPE_CREDIT],
             status=Transaction.STATUS_COMPLETED,
             date__gte=tx_query_start,
             date__lt=_add_months(end_month, 1),
@@ -2753,7 +2790,11 @@ def projecao(request):
     for _tx in tx_detail_qs:
         _mo = _tx.date.replace(day=1)
         _first = acc_first_snap.get(_tx.account_id)
-        if _first is None or _mo <= _first:
+        if _first is None:
+            # Credit cards have no snapshots — include all their transactions
+            if _tx.account.type != Account.TYPE_CREDIT:
+                continue
+        elif _mo <= _first:
             continue
         tx_by_acc_month.setdefault((_tx.account_id, _mo), []).append(_tx)
         per_acc_names.setdefault(_tx.account_id, _tx.account.name)
@@ -2967,6 +3008,31 @@ def projecao(request):
                     "batimento_abs": abs(diff),
                     "batimento_abs_str": str(abs(diff)),
                     "account_investments": _inv_by_acc.get(aid, []),
+                    "is_credit": False,
+                })
+
+        # Credit card batimento: balance is always 0, so net transactions must also be 0.
+        # Only check months where the card has actual transactions.
+        for _cid in _credit_acc_ids:
+            _c_txs = tx_by_acc_month.get((_cid, mo), [])
+            if not _c_txs:
+                continue
+            checked_any = True
+            _c_net = acc_month_net.get((_cid, mo), Decimal("0"))
+            for _r in recurring_by_acc.get(_cid, []):
+                _ramt = _amount_for_month(_r, mo)
+                _c_net += _ramt if _r.type == RecurringTransaction.TYPE_INCOME else -_ramt
+            # diff = expected_balance - (prev_balance + net) = 0 - (0 + net) = -net
+            _c_diff = -_c_net
+            if abs(_c_diff) >= Decimal("0.01"):
+                batimento_issues.append({
+                    "account_id": _cid,
+                    "account_name": per_acc_names.get(_cid, f"Cartão {_cid}"),
+                    "batimento_diff": _c_diff,
+                    "batimento_abs": abs(_c_diff),
+                    "batimento_abs_str": str(abs(_c_diff)),
+                    "account_investments": [],
+                    "is_credit": True,
                 })
 
         if batimento_issues:
