@@ -663,11 +663,20 @@ def diagnostico(request):
 
     var_inc_amt    = period_txs.filter(type=Transaction.TYPE_CREDIT, is_transfer=False, is_investment=False).aggregate(t=Sum("amount"))["t"] or Decimal("0")
     var_exp_amt    = period_txs.filter(type=Transaction.TYPE_DEBIT,  is_transfer=False, is_investment=False).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    inv_income_amt = period_txs.filter(type=Transaction.TYPE_CREDIT, is_investment=True).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    # Only earnings and dividends count as income — buy/sell boletas are excluded
+    earn_amt = period_txs.filter(
+        type=Transaction.TYPE_CREDIT, is_investment=True,
+        inv_boleta__type=InvestmentTransaction.TYPE_EARNINGS,
+    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    div_amt = period_txs.filter(
+        type=Transaction.TYPE_CREDIT, is_investment=True,
+        inv_boleta__type=InvestmentTransaction.TYPE_DIVIDENDS,
+    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    inv_income_amt = earn_amt + div_amt
 
     fixed_inc_amt = fixos_inc_total
     fixed_exp_amt = fixos_exp_total
-    income        = var_inc_amt + fixos_inc_total
+    income        = var_inc_amt + fixos_inc_total + inv_income_amt
     expense       = var_exp_amt + fixos_exp_total
     month_balance = income - expense
 
@@ -728,14 +737,22 @@ def diagnostico(request):
     all_exp_cat_data = _merge_cat(exp_cat_data, fixos_exp_list, expense)
     all_inc_cat_data = _merge_cat(inc_cat_data, fixos_inc_list, income)
 
-    # Append investment income as a separate slice in the income ring
-    if inv_income_amt:
+    # Append earnings and dividends as separate slices — buy/sell excluded
+    if earn_amt:
         all_inc_cat_data.append({
-            "name":   "Resultado Invest.",
+            "name":   "Rendimentos",
             "icon":   "trending-up",
             "color":  "#06B6D4",
-            "amount": inv_income_amt,
+            "amount": earn_amt,
         })
+    if div_amt:
+        all_inc_cat_data.append({
+            "name":   "Dividendos",
+            "icon":   "dollar-sign",
+            "color":  "#F59E0B",
+            "amount": div_amt,
+        })
+    if earn_amt or div_amt:
         all_inc_cat_data.sort(key=lambda x: -x["amount"])
 
     inc_chart_total = sum(cat["amount"] for cat in all_inc_cat_data) or Decimal("1")
@@ -848,7 +865,63 @@ def diagnostico(request):
 @login_required
 def investimentos(request):
     now = _now_br()
+    today = now.date()
+    current_month = today.replace(day=1)
 
+    # ── Period / date-range ────────────────────────────────────────────────────
+    period = request.GET.get("period", "mes")
+    if period not in ("mes", "ano", "12m", "24m", "inicio"):
+        period = "mes"
+
+    prev_month = prev_year = next_month = next_year = None
+    month = year = None
+
+    if period == "mes":
+        try:
+            year  = int(request.GET.get("ano", now.year))
+            month = int(request.GET.get("mes", now.month))
+        except (ValueError, TypeError):
+            year, month = now.year, now.month
+        if not (1 <= month <= 12):
+            month = now.month
+        date_from = date(year, month, 1)
+        date_to   = _add_months(date_from, 1)
+        period_label = f"{_MONTHS[month - 1].capitalize()} {year}"
+        prev_dt = _add_months(date_from, -1)
+        next_dt = date_to
+        prev_month, prev_year = prev_dt.month, prev_dt.year
+        next_month, next_year = next_dt.month, next_dt.year
+        is_mes, is_ano = True, False
+    elif period == "ano":
+        try:
+            year = int(request.GET.get("ano", now.year))
+        except (ValueError, TypeError):
+            year = now.year
+        date_from = date(year, 1, 1)
+        date_to   = date(year + 1, 1, 1)
+        period_label = str(year)
+        prev_year, next_year = year - 1, year + 1
+        is_mes, is_ano = False, True
+    elif period == "12m":
+        date_to   = _add_months(current_month, 1)
+        date_from = _add_months(date_to, -12)
+        period_label = "Últimos 12 meses"
+        is_mes = is_ano = False
+    elif period == "24m":
+        date_to   = _add_months(current_month, 1)
+        date_from = _add_months(date_to, -24)
+        period_label = "Últimos 24 meses"
+        is_mes = is_ano = False
+    else:  # inicio
+        date_to = _add_months(current_month, 1)
+        _first = InvestmentTransaction.objects.filter(user=request.user).order_by("date").values("date").first()
+        date_from = _first["date"].replace(day=1) if _first else current_month
+        period_label = "Desde o início"
+        is_mes = is_ano = False
+
+    period_choices = [("mes", "Mês"), ("ano", "Ano"), ("12m", "12m"), ("24m", "24m"), ("inicio", "Início")]
+
+    # ── Static queries ─────────────────────────────────────────────────────────
     latest_balance_subq = AccountMonthSnapshot.objects.filter(
         account=OuterRef("pk")
     ).order_by("-month").values("balance")[:1]
@@ -858,71 +931,106 @@ def investimentos(request):
         .filter(user=request.user, is_active=True, type__in=_CUSTODY_TYPES)
         .annotate(latest_balance=Subquery(latest_balance_subq))
     )
-    cash_balance = _projected_cash_balance(request.user, now.date())
+    cash_balance = _projected_cash_balance(request.user, today)
 
-    # Investments queryset — used for modal dropdowns only
+    # Investments queryset — used for modal dropdowns (always current)
     investments = Investment.objects.filter(user=request.user).select_related("account").order_by("type", "name")
 
-    # Pre-fetch account lookup for position building
     acc_map = {a.pk: a for a in Account.objects.filter(user=request.user, is_active=True)}
     inv_map = {i.pk: i for i in investments}
 
-    # Aggregate per (investment, account) from transaction history — the source of truth
+    # ── Filtered tx_agg: position as of date_to (cumulative) ──────────────────
     tx_agg = (
         InvestmentTransaction.objects
-        .filter(user=request.user)
+        .filter(user=request.user, date__lt=date_to)
         .values("investment_id", "account_id")
         .annotate(
-            buy_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_BUY)),
-            sell_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_SELL)),
-            earn_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_EARNINGS)),
+            buy_total=Sum("amount",    filter=Q(type=InvestmentTransaction.TYPE_BUY)),
+            sell_total=Sum("amount",   filter=Q(type=InvestmentTransaction.TYPE_SELL)),
+            earn_total=Sum("amount",   filter=Q(type=InvestmentTransaction.TYPE_EARNINGS)),
+            qty_bought=Sum("quantity", filter=Q(type=InvestmentTransaction.TYPE_BUY)),
+            qty_sold=Sum("quantity",   filter=Q(type=InvestmentTransaction.TYPE_SELL)),
+            # Earnings/dividends restricted to the selected period for display
+            earn_period=Sum("amount",  filter=Q(type=InvestmentTransaction.TYPE_EARNINGS, date__gte=date_from)),
+            div_period=Sum("amount",   filter=Q(type=InvestmentTransaction.TYPE_DIVIDENDS, date__gte=date_from)),
         )
     )
 
+    # ── Current tx totals (unfiltered) — for modal effective-price JSON ────────
+    _inv_current_total: dict = {}
+    for _row in (
+        InvestmentTransaction.objects
+        .filter(user=request.user)
+        .values("investment_id")
+        .annotate(
+            buy_total=Sum("amount",  filter=Q(type=InvestmentTransaction.TYPE_BUY)),
+            sell_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_SELL)),
+            earn_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_EARNINGS)),
+        )
+    ):
+        _cur = (
+            (_row["buy_total"] or Decimal("0"))
+            - (_row["sell_total"] or Decimal("0"))
+            + (_row["earn_total"] or Decimal("0"))
+        )
+        if _cur > 0:
+            _inv_current_total[_row["investment_id"]] = _cur
+
+    # ── Position building from period-filtered tx_agg ──────────────────────────
     inv_by_type: dict = {}
     inv_total = Decimal("0")
     _by_acc: dict = {}
-    _inv_current_total: dict = {}  # {investment_id: current_value} for effective price calc
 
     for row in tx_agg:
         inv_obj = inv_map.get(row["investment_id"])
         acc_obj = acc_map.get(row["account_id"]) if row["account_id"] else None
         if not inv_obj:
             continue
-        cost = (row["buy_total"] or Decimal("0")) - (row["sell_total"] or Decimal("0"))
-        earn = row["earn_total"] or Decimal("0")
-        current = cost + earn
+        cost        = (row["buy_total"] or Decimal("0")) - (row["sell_total"] or Decimal("0"))
+        earn        = row["earn_total"] or Decimal("0")
+        current     = cost + earn
         if current <= 0:
-            continue  # fully exited position — skip
+            continue
 
-        _inv_current_total[row["investment_id"]] = _inv_current_total.get(row["investment_id"], Decimal("0")) + current
+        # Gains shown to the user = only within the selected period
+        earn_period = (row["earn_period"] or Decimal("0")) + (row["div_period"] or Decimal("0"))
 
         key = row["account_id"] or 0
         if key not in _by_acc:
-            _by_acc[key] = {"account": acc_obj, "positions": [], "total": Decimal("0"), "cost": Decimal("0")}
-        qty = inv_obj.quantity if inv_obj.tracking_mode == Investment.TRACKING_QP else None
+            _by_acc[key] = {
+                "account": acc_obj, "positions": [],
+                "total": Decimal("0"), "cost": Decimal("0"), "period_earn": Decimal("0"),
+            }
+
+        # Historical quantity: computed from filtered buy/sell boletas
+        if inv_obj.tracking_mode == Investment.TRACKING_QP:
+            hist_qty = (row["qty_bought"] or Decimal("0")) - (row["qty_sold"] or Decimal("0"))
+            qty = hist_qty if hist_qty > 0 else None
+        else:
+            qty = None
         unit_price = (current / qty).quantize(Decimal("0.01")) if qty and qty > 0 else None
+
         _by_acc[key]["positions"].append({
             "inv": inv_obj,
             "current_value": current,
             "cost": cost,
-            "profit_loss": earn,
+            "profit_loss": earn_period,   # period earnings for display
             "display_qty": qty,
             "display_unit_price": unit_price,
         })
-        _by_acc[key]["total"] += current
-        _by_acc[key]["cost"] += cost
+        _by_acc[key]["total"]       += current
+        _by_acc[key]["cost"]        += cost
+        _by_acc[key]["period_earn"] += earn_period
 
         inv_by_type.setdefault(inv_obj.get_type_display(), Decimal("0"))
         inv_by_type[inv_obj.get_type_display()] += current
         inv_total += current
 
     for g in _by_acc.values():
-        g["profit_loss"] = g["total"] - g["cost"]
+        g["profit_loss"] = g["period_earn"]   # group-level: period earnings only
         g["positions"].sort(key=lambda p: (p["inv"].type, p["inv"].name))
     custody_groups = sorted(_by_acc.values(), key=lambda g: g["account"].name if g["account"] else "zzz")
 
-    # Liquid (cash-only) balance per account: snapshot − invested value for that account
     inv_by_acc: dict = {k: g["total"] for k, g in _by_acc.items() if k}
     cash_accounts_list = []
     for _acc in cash_accounts:
@@ -930,16 +1038,18 @@ def investimentos(request):
         _acc.liquid_balance = _snap - inv_by_acc.get(_acc.pk, Decimal("0"))
         cash_accounts_list.append(_acc)
 
-    goals = Goal.objects.filter(user=request.user, is_completed=False).order_by("deadline")
+    goals        = Goal.objects.filter(user=request.user, is_completed=False).order_by("deadline")
     inv_accounts = Account.objects.filter(user=request.user, type__in=_CUSTODY_TYPES, is_active=True)
     boleta_accounts = Account.objects.filter(
         user=request.user, is_active=True
     ).exclude(type=Account.TYPE_CREDIT)
+
+    # ── Boletas filtered to selected period ────────────────────────────────────
     recent_boletas = (
         InvestmentTransaction.objects
-        .filter(user=request.user)
+        .filter(user=request.user, date__gte=date_from, date__lt=date_to)
         .select_related("investment", "account")
-        .order_by("-date", "-created_at")[:20]
+        .order_by("date", "created_at")
     )
 
     inv_modes_json = json.dumps({str(i.pk): i.tracking_mode for i in investments})
@@ -952,22 +1062,34 @@ def investimentos(request):
         return float(inv_obj.current_price)
 
     return render(request, "dashboard/investimentos.html", {
-        "cash_accounts": cash_accounts_list,
-        "cash_balance": cash_balance,
-        "inv_by_type": inv_by_type,
-        "inv_total": inv_total,
-        "disponivel": cash_balance,
-        "patrimonio": cash_balance + inv_total,
-        "goals": goals,
-        "investments": investments,
-        "custody_groups": custody_groups,
-        "inv_accounts": inv_accounts,
-        "investment_types": Investment.TYPE_CHOICES,
-        "boleta_accounts": boleta_accounts,
-        "recent_boletas": recent_boletas,
-        "inv_modes_json": inv_modes_json,
-        "inv_prices_json": json.dumps({str(i.pk): _effective_price(i) for i in investments}),
-        "inv_qty_json": json.dumps({str(i.pk): float(i.quantity) for i in investments}),
+        "cash_accounts":      cash_accounts_list,
+        "cash_balance":       cash_balance,
+        "inv_by_type":        inv_by_type,
+        "inv_total":          inv_total,
+        "disponivel":         cash_balance,
+        "patrimonio":         cash_balance + inv_total,
+        "goals":              goals,
+        "investments":        investments,
+        "custody_groups":     custody_groups,
+        "inv_accounts":       inv_accounts,
+        "investment_types":   Investment.TYPE_CHOICES,
+        "boleta_accounts":    boleta_accounts,
+        "recent_boletas":     recent_boletas,
+        "inv_modes_json":     inv_modes_json,
+        "inv_prices_json":    json.dumps({str(i.pk): _effective_price(i) for i in investments}),
+        "inv_qty_json":       json.dumps({str(i.pk): float(i.quantity) for i in investments}),
+        # Period
+        "period":        period,
+        "period_label":  period_label,
+        "period_choices": period_choices,
+        "is_mes":        is_mes,
+        "is_ano":        is_ano,
+        "month":         month,
+        "year":          year,
+        "prev_month":    prev_month,
+        "prev_year":     prev_year,
+        "next_month":    next_month,
+        "next_year":     next_year,
     })
 
 
@@ -994,7 +1116,12 @@ def lancamentos(request):
         if description and amount > 0 and account_pk:
             try:
                 acc = Account.objects.get(pk=account_pk, user=request.user)
-                category = Category.objects.get(pk=category_pk) if category_pk else None
+                category = None
+                if category_pk:
+                    cat = Category.objects.filter(pk=category_pk).first()
+                    expected = "income" if tx_type == Transaction.TYPE_CREDIT else "expense"
+                    if cat and cat.type == expected:
+                        category = cat
                 goal = None
                 if goal_pk:
                     try:
@@ -1027,8 +1154,13 @@ def lancamentos(request):
         redirect_to = request.POST.get("redirect_to", "")
         if redirect_to == "projecao":
             return redirect("projecao")
-        tab = "entradas" if tx_type == Transaction.TYPE_CREDIT else "saidas"
-        return redirect(f"/dashboard/lancamentos/?ano={tx_date.year}&mes={tx_date.month}&tab={tab}")
+        _period = request.POST.get("period", "mes")
+        if _period not in ("mes", "ano", "12m", "24m", "inicio"):
+            _period = "mes"
+        _tab = "entradas" if tx_type == Transaction.TYPE_CREDIT else "saidas"
+        if _period == "mes":
+            return redirect(f"/dashboard/lancamentos/?period=mes&ano={tx_date.year}&mes={tx_date.month}&tab={_tab}")
+        return redirect(f"/dashboard/lancamentos/?period={_period}&tab={_tab}")
 
     # ── GET ──
     period = request.GET.get("period", "mes")
@@ -1408,7 +1540,12 @@ def fixo_criar(request):
             account = Account.objects.get(pk=account_pk, user=request.user)
         except Account.DoesNotExist:
             return redirect("/dashboard/lancamentos/?tab=fixos")
-        category = Category.objects.get(pk=category_pk) if category_pk else None
+        category = None
+        if category_pk:
+            cat = Category.objects.filter(pk=category_pk).first()
+            expected = "income" if fx_type == RecurringTransaction.TYPE_INCOME else "expense"
+            if cat and cat.type == expected:
+                category = cat
         goal = None
         if goal_pk:
             try:
@@ -1462,10 +1599,9 @@ def fixo_editar(request, pk):
             rt.day_of_week = None
         category_pk = _iv(request.POST.get("category"))
         if category_pk:
-            try:
-                rt.category = Category.objects.get(pk=category_pk)
-            except Category.DoesNotExist:
-                rt.category = None
+            cat = Category.objects.filter(pk=category_pk).first()
+            expected = "income" if rt.type == RecurringTransaction.TYPE_INCOME else "expense"
+            rt.category = cat if (cat and cat.type == expected) else None
         else:
             rt.category = None
         goal_pk = _iv(request.POST.get("goal"))
@@ -1580,7 +1716,7 @@ def contas(request):
         }
 
     matrix_json = json.dumps(matrix, ensure_ascii=False)
-    months_list = [(m.strftime("%Y-%m"), m.strftime("%b/%Y")) for m in months]
+    months_list = [(m.strftime("%Y-%m"), f"{_MONTHS[m.month - 1][:3].capitalize()}/{m.year}") for m in months]
 
     total_balance = sum(
         (Decimal(str(matrix[a.pk][months[-1].strftime("%Y-%m")]["b"]))
@@ -1620,8 +1756,8 @@ def snapshot_criar(request):
             if latest and latest.month != mo and _add_months(latest.month, 1) < mo:
                 messages.error(
                     request,
-                    f"Não é possível registrar o saldo de {mo.strftime('%B/%Y')} sem antes preencher os meses "
-                    f"intermediários. O último mês registrado para {acc.name} é {latest.month.strftime('%B/%Y')}.",
+                    f"Não é possível registrar o saldo de {_MONTHS[mo.month - 1].capitalize()}/{mo.year} sem antes preencher os meses "
+                    f"intermediários. O último mês registrado para {acc.name} é {_MONTHS[latest.month.month - 1].capitalize()}/{latest.month.year}.",
                 )
                 return redirect("contas")
             AccountMonthSnapshot.objects.update_or_create(
@@ -2209,6 +2345,143 @@ def investimento_boleta(request):
 
 @login_required
 @require_POST
+def investimento_boleta_editar(request, pk):
+    """Edit an existing InvestmentTransaction (boleta)."""
+    boleta = get_object_or_404(InvestmentTransaction, pk=pk, user=request.user)
+    inv = boleta.investment
+
+    tx_date = _dt(request.POST.get("date")) or boleta.date
+    notes = request.POST.get("notes", "").strip()
+
+    account_pk = _iv(request.POST.get("account"))
+    account = None
+    if account_pk:
+        try:
+            acc = Account.objects.get(pk=account_pk, user=request.user)
+            if acc.type != Account.TYPE_CREDIT:
+                account = acc
+        except Account.DoesNotExist:
+            pass
+
+    if boleta.type in (InvestmentTransaction.TYPE_BUY, InvestmentTransaction.TYPE_SELL):
+        is_qp = inv.tracking_mode == Investment.TRACKING_QP
+        if is_qp:
+            qty = _d(request.POST.get("quantity"), Decimal("0"))
+            up  = _d(request.POST.get("unit_price"), Decimal("0"))
+            if qty <= 0 or up <= 0:
+                return redirect("investimentos")
+            total = qty * up
+        else:
+            total = _d(request.POST.get("financeiro"), Decimal("0"))
+            if total <= 0:
+                return redirect("investimentos")
+            qty = None
+            up  = None
+
+        boleta.date       = tx_date
+        boleta.account    = account
+        boleta.quantity   = qty
+        boleta.unit_price = up
+        boleta.amount     = total
+        boleta.notes      = notes
+        boleta.save()
+
+        if boleta.cash_transaction:
+            ct = boleta.cash_transaction
+            ct.date    = tx_date
+            ct.amount  = total
+            ct.account = account
+            ct.notes   = notes
+            ct.save()
+
+        # Recompute inv.quantity from full buy/sell history to keep Investment in sync
+        if inv.tracking_mode == Investment.TRACKING_QP:
+            agg = InvestmentTransaction.objects.filter(
+                user=request.user, investment=inv
+            ).aggregate(
+                qty_bought=Sum("quantity", filter=Q(type=InvestmentTransaction.TYPE_BUY)),
+                qty_sold=Sum("quantity", filter=Q(type=InvestmentTransaction.TYPE_SELL)),
+            )
+            inv.quantity = max(
+                Decimal("0"),
+                (agg["qty_bought"] or Decimal("0")) - (agg["qty_sold"] or Decimal("0")),
+            )
+            inv.save(update_fields=["quantity"])
+
+    elif boleta.type == InvestmentTransaction.TYPE_EARNINGS:
+        try:
+            amount = Decimal(str(request.POST.get("amount", "0")).replace(",", "."))
+        except (InvalidOperation, TypeError):
+            return redirect("investimentos")
+
+        boleta.date    = tx_date
+        boleta.account = account
+        boleta.amount  = amount
+        boleta.notes   = notes
+        boleta.save()
+
+        if boleta.cash_transaction:
+            ct = boleta.cash_transaction
+            ct.date    = tx_date
+            ct.amount  = abs(amount)
+            ct.type    = Transaction.TYPE_CREDIT if amount >= 0 else Transaction.TYPE_DEBIT
+            ct.account = account
+            ct.notes   = notes
+            ct.save()
+        elif account:
+            earn_tx = Transaction.objects.create(
+                account=account,
+                amount=abs(amount),
+                type=Transaction.TYPE_CREDIT if amount >= 0 else Transaction.TYPE_DEBIT,
+                date=tx_date,
+                description=f"Rendimento: {inv.ticker or inv.name}",
+                notes=notes,
+                status=Transaction.STATUS_COMPLETED,
+                is_investment=True,
+            )
+            boleta.cash_transaction = earn_tx
+            boleta.save(update_fields=["cash_transaction"])
+
+    elif boleta.type == InvestmentTransaction.TYPE_DIVIDENDS:
+        try:
+            amount = Decimal(str(request.POST.get("amount", "0")).replace(",", "."))
+        except (InvalidOperation, TypeError):
+            return redirect("investimentos")
+        if amount <= 0:
+            return redirect("investimentos")
+
+        boleta.date    = tx_date
+        boleta.account = account
+        boleta.amount  = amount
+        boleta.notes   = notes
+        boleta.save()
+
+        if boleta.cash_transaction:
+            ct = boleta.cash_transaction
+            ct.date    = tx_date
+            ct.amount  = amount
+            ct.account = account
+            ct.notes   = notes
+            ct.save()
+        elif account:
+            div_tx = Transaction.objects.create(
+                account=account,
+                amount=amount,
+                type=Transaction.TYPE_CREDIT,
+                date=tx_date,
+                description=f"Dividendo: {inv.ticker or inv.name}",
+                notes=notes,
+                status=Transaction.STATUS_COMPLETED,
+                is_investment=True,
+            )
+            boleta.cash_transaction = div_tx
+            boleta.save(update_fields=["cash_transaction"])
+
+    return redirect("investimentos")
+
+
+@login_required
+@require_POST
 def investimento_rendimento(request, pk):
     """Legacy endpoint — kept for safety; delegates to the unified boleta flow."""
     inv = get_object_or_404(Investment, pk=pk, user=request.user)
@@ -2375,6 +2648,7 @@ def projecao(request):
         .annotate(total=Sum("amount"))
     )
     acc_month_net: dict = {}  # {(account_id, month): net_amount}
+    inv_cash: dict = {}      # {(month, "credit"/"debit"): amount} — buy/sell cash flows, kept separate from actual so they don't inflate vi/ve display
     for _row in per_acc_tx_raw:
         _mo = (_row["mo"] if isinstance(_row["mo"], date) else _row["mo"].date()).replace(day=1)
         _aid = _row["account_id"]
@@ -2413,12 +2687,9 @@ def projecao(request):
         _sign = Decimal("1") if _is_sell else Decimal("-1")
         _key = (_aid, _mo)
         acc_month_net[_key] = acc_month_net.get(_key, Decimal("0")) + _sign * _delta
-        # Also add to `actual` so buy/sell appear in net (variable income/expense).
-        # This makes result_total = end_balance[M] - end_balance[M-1] hold consistently:
-        # sell → variable income (+), buy → variable expense (-).
+        # Track cash impact of buy/sell separately — included in balance but NOT in vi/ve display.
         _act_type = "credit" if _is_sell else "debit"
-        _act_key = (_mo, _act_type, False)
-        actual[_act_key] = actual.get(_act_key, Decimal("0")) + _delta
+        inv_cash[(_mo, _act_type)] = inv_cash.get((_mo, _act_type), Decimal("0")) + _delta
 
     # Dividends: always financial, always impact cash, excluded from portfolio value.
     # Their cash transactions are is_investment=True so they're not in per_acc_tx_raw above.
@@ -2633,6 +2904,8 @@ def projecao(request):
                 + actual.get((m, "credit", True), Decimal("0"))
                 - actual.get((m, "debit", False), Decimal("0"))
                 - actual.get((m, "debit", True), Decimal("0"))
+                + inv_cash.get((m, "credit"), Decimal("0"))
+                - inv_cash.get((m, "debit"), Decimal("0"))
             )
             running_balance += gap_net
             if m in cash_snaps_liquid:
@@ -2707,9 +2980,8 @@ def projecao(request):
         # Capture opening balances for drill-down before acc_last_known is modified.
         opening_bal = dict(acc_last_known)
 
-        # end_balance: merge snapshot accounts with carry-forward for non-snapshot ones.
-        # When only a subset of known accounts has a snapshot in month M, carry forward
-        # the others using actual transactions so the total stays incremental.
+        # liquid_end: cash-only balance (running_balance stays liquid for correct increments).
+        # end_balance (shown to user): liquid_end + invested value = full patrimonial.
         snap_this_mo = per_acc_snaps_liquid.get(mo, {})
         if snap_this_mo:
             snap_sum = sum(snap_this_mo.values())
@@ -2721,9 +2993,13 @@ def projecao(request):
                     carry_sum += _carried
             for _aid, _snap_bal in snap_this_mo.items():
                 acc_last_known[_aid] = _snap_bal
-            end_balance = snap_sum + carry_sum
+            liquid_end = snap_sum + carry_sum
         else:
-            end_balance = running_balance + net
+            inv_net_mo = (
+                inv_cash.get((mo, "credit"), Decimal("0"))
+                - inv_cash.get((mo, "debit"), Decimal("0"))
+            )
+            liquid_end = running_balance + net + inv_net_mo
             for _aid in list(acc_last_known.keys()):
                 _rec_net = sum(
                     (_amount_for_month(_r, mo) if _r.type == RecurringTransaction.TYPE_INCOME
@@ -2732,7 +3008,14 @@ def projecao(request):
                 )
                 acc_last_known[_aid] += acc_month_net.get((_aid, mo), Decimal("0")) + _rec_net
 
-        running_balance = end_balance
+        running_balance = liquid_end  # always liquid so future net increments stay correct
+
+        # Patrimonial end_balance = liquid cash + cumulative invested value across all accounts
+        inv_total_mo = sum(
+            inv_value_by_acc_month.get((_aid, mo), Decimal("0"))
+            for _aid in {aid for (aid, _) in inv_value_by_acc_month}
+        )
+        end_balance = liquid_end + inv_total_mo
 
         # ── Drill-down: per-account transaction breakdown ──────────────────────
         _drill_aids: set = set(per_acc_snaps_liquid.get(mo, {}).keys())
@@ -2834,6 +3117,7 @@ def projecao(request):
                 "opening_balance": opening_bal.get(_did),
                 "cash_tx_count": _cash_count,
                 "inv_tx_count": _inv_count,
+                "inv_balance": inv_value_by_acc_month.get((_did, mo), Decimal("0")),
             })
 
         # Unassigned recurring (no account) — shown for all months, not just future

@@ -43,6 +43,7 @@ urlpatterns = [
     # Investimentos
     path("investimentos/criar/", views.investimento_criar, name="investimento_criar"),
     path("investimentos/boleta/", views.investimento_boleta, name="investimento_boleta"),
+    path("investimentos/boleta/<int:pk>/editar/", views.investimento_boleta_editar, name="investimento_boleta_editar"),
     path("investimentos/<int:pk>/editar/", views.investimento_editar, name="investimento_editar"),
     path("investimentos/<int:pk>/excluir/", views.investimento_excluir, name="investimento_excluir"),
     path("investimentos/<int:pk>/rendimento/", views.investimento_rendimento, name="investimento_rendimento"),

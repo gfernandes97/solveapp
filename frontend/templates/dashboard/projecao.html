@@ -277,7 +277,7 @@
           <th class="border-l border-slate-100 px-3 py-2 text-center text-solve" colspan="3">Entradas</th>
           <th class="border-l border-slate-100 px-3 py-2 text-center text-red-400" colspan="3">Saídas</th>
           <th class="border-l border-slate-100 px-3 py-2 text-center text-obsidian" colspan="3">Resultado</th>
-          <th class="border-l border-slate-100 px-3 py-3 text-right" rowspan="2">Saldo Final</th>
+          <th class="border-l border-slate-100 px-3 py-3 text-right" rowspan="2">Patrimônio</th>
         </tr>
         <tr class="border-b-2 border-slate-200 bg-slate-50 text-xs text-smoke">
           <th class="border-l border-slate-100 px-3 py-2 text-right font-medium whitespace-nowrap">Fixas</th>
@@ -423,7 +423,7 @@
                         <th class="w-28 px-3 py-1.5 text-right font-medium text-solve">Entrada</th>
                         <th class="w-28 px-3 py-1.5 text-right font-medium text-red-400">Saída</th>
                         <th class="w-28 px-3 py-1.5 text-right font-medium">Resultado</th>
-                        <th class="w-32 px-3 py-1.5 text-right font-medium">Saldo Final</th>
+                        <th class="w-32 px-3 py-1.5 text-right font-medium">Patrimônio</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -480,6 +480,19 @@
                         </td>
                         <td class="px-3 py-2 text-right tabular-nums text-smoke">—</td>
                       </tr>
+                      {% if acc.inv_balance %}
+                      <tr class="border-t border-signal/20 bg-signal/5 text-xs">
+                        <td class="px-4 py-2 text-smoke/50">—</td>
+                        <td class="px-3 py-2 font-semibold text-signal flex items-center gap-1.5">
+                          <svg class="h-3 w-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                          Investimentos
+                        </td>
+                        <td class="px-3 py-2 text-right text-smoke/40">—</td>
+                        <td class="px-3 py-2 text-right text-smoke/40">—</td>
+                        <td class="px-3 py-2 text-right text-smoke/40">—</td>
+                        <td class="px-3 py-2 text-right tabular-nums font-bold text-signal">{{ acc.inv_balance|brl }}</td>
+                      </tr>
+                      {% endif %}
                     </tfoot>
                   </table>
                 </div>
@@ -526,7 +539,7 @@
           <span class="inline-block h-0.5 w-3 rounded" style="background:#64748B"></span>
           <span class="inline-block h-0.5 w-1.5 rounded" style="background:#7C3AED; margin-left:2px; border-top: 2px dashed #7C3AED; background:transparent"></span>
         </span>
-        <span>Saldo Final</span>
+        <span>Patrimônio</span>
         <span class="rounded bg-obsidian/10 px-1 py-px text-[10px] font-semibold text-obsidian">eixo esq.</span>
       </span>
       <span class="ml-auto italic opacity-60">Barras claras = projeção</span>
@@ -539,7 +552,7 @@
 
   <p class="text-center text-xs text-smoke">
     Projeções baseadas nos lançamentos fixos (recorrentes) cadastrados.
-    Saldo final ancorado nos registros mensais de saldo das custódias.
+    Saldo patrimonial total: caixa + investimentos. Ancorado nos registros mensais das custódias; investimentos carregados pelo último valor registrado.
   </p>
 
 </div>
@@ -772,7 +785,7 @@ function toggleDrill(n) {
         },
         {
           type: 'line',
-          label: 'Saldo Final',
+          label: 'Patrimônio',
           data: balData,
           borderWidth: 2.5,
           pointBackgroundColor: types.map(balPointColor),
@@ -826,7 +839,7 @@ function toggleDrill(n) {
           grid: { color: 'rgba(0,0,0,0.04)' },
           title: {
             display: true,
-            text: 'Saldo Final',
+            text: 'Patrimônio',
             color: '#0F172A',
             font: { size: 11, weight: '700' },
             padding: { bottom: 4 },
