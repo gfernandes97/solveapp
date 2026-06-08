@@ -10,7 +10,7 @@
   <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
     <div>
       <h1 class="text-2xl font-black tracking-tight text-obsidian">Contas</h1>
-      <p class="mt-0.5 text-sm text-smoke">Registre o <strong class="font-semibold text-obsidian">saldo total da conta no encerramento de cada mês</strong> — não o que entrou ou saiu, mas o valor final que ficou nela.</p>
+      <p class="mt-0.5 text-sm text-smoke">Cadastre <strong class="font-semibold text-obsidian">todas as suas contas</strong> — bancárias, cartões de crédito e custódias de investimento. Depois, registre o saldo total de cada uma no encerramento de cada mês.</p>
     </div>
     <div class="flex items-center gap-2 self-start sm:self-auto">
       {% if total_balance %}
@@ -19,29 +19,55 @@
       </span>
       {% endif %}
       <button onclick="openModal('modal-nova-conta')" data-tour-action="nova-conta"
-              class="inline-flex items-center gap-2 rounded-lg bg-solve px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-solve-dark">
+              class="inline-flex items-center gap-2 rounded-lg bg-solve px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-solve-dark whitespace-nowrap">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         Nova conta
       </button>
     </div>
   </div>
 
+  {% if has_accounts and not credit_accounts or has_accounts and not investment_accounts %}
+  <div class="flex flex-col gap-3 sm:flex-row">
+    {% if not credit_accounts %}
+    <div class="flex flex-1 items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
+      <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-obsidian/8 text-base">💳</span>
+      <div class="min-w-0">
+        <p class="text-sm font-semibold text-obsidian">Tem cartão de crédito?</p>
+        <p class="mt-0.5 text-xs text-smoke">Cadastre-o aqui para o Solve monitorar o batimento da fatura e sugerir o pagamento automaticamente na Projeção.</p>
+        <button onclick="openModal('modal-nova-conta')" class="mt-2 text-xs font-semibold text-solve hover:underline">Adicionar cartão →</button>
+      </div>
+    </div>
+    {% endif %}
+    {% if not investment_accounts %}
+    <div class="flex flex-1 items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
+      <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-obsidian/8 text-base">📈</span>
+      <div class="min-w-0">
+        <p class="text-sm font-semibold text-obsidian">Tem investimentos?</p>
+        <p class="mt-0.5 text-xs text-smoke">Adicione a custódia (corretora ou banco) para o patrimônio investido aparecer na Projeção e no Diagnóstico.</p>
+        <button onclick="openModal('modal-nova-conta')" class="mt-2 text-xs font-semibold text-solve hover:underline">Adicionar custódia →</button>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {% if has_accounts and months_list %}
 
   <!-- ── Tabela matricial ── -->
-  <div class="rounded-xl border border-slate-200 bg-white shadow overflow-hidden">
+  <!-- overflow:clip preserva border-radius sem criar scroll-container, permitindo sticky no thead -->
+  <div class="rounded-xl border border-slate-200 bg-white shadow" style="overflow: clip">
     <div class="overflow-x-auto">
       <table class="w-full border-collapse text-sm" style="min-width: max(600px, 100%);">
 
-        <!-- Cabeçalho: meses -->
+        <!-- Cabeçalho: meses — sticky top + freeze horizontal no canto -->
         <thead>
-          <tr class="border-b border-slate-200 bg-slate-50">
-            <!-- Coluna fixa: nome da conta -->
-            <th class="freeze-col sticky left-0 z-10 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-smoke min-w-[200px]">
+          <tr class="bg-slate-50">
+            <!-- Canto: freeze horizontal E vertical -->
+            <th class="freeze-col sticky left-0 top-0 z-30 bg-slate-50 border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-smoke min-w-[200px]">
               Custódia
             </th>
             {% for mo_str, mo_lbl in months_list %}
-            <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-smoke whitespace-nowrap min-w-[110px]">
+            <th class="sticky top-0 z-20 bg-slate-50 border-b border-slate-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-smoke whitespace-nowrap min-w-[110px]">
               {{ mo_lbl }}
             </th>
             {% endfor %}
@@ -54,7 +80,7 @@
           <!-- Seção: Bancárias e Carteiras -->
           <tr class="border-b border-slate-100 bg-slate-50/60">
             <td colspan="{{ months_list|length|add:1 }}"
-                class="freeze-col sticky left-0 bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-smoke">
+                class="freeze-col sticky left-0 top-[43px] z-[15] bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-smoke">
               Contas bancárias e carteiras
             </td>
           </tr>
@@ -95,7 +121,7 @@
           {% if credit_accounts %}
           <tr class="border-b border-slate-100 bg-slate-50/60">
             <td colspan="{{ months_list|length|add:1 }}"
-                class="freeze-col sticky left-0 bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-smoke">
+                class="freeze-col sticky left-0 top-[43px] z-[15] bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-smoke">
               Cartões de crédito
             </td>
           </tr>
@@ -135,7 +161,7 @@
           {% if investment_accounts %}
           <tr class="border-b border-slate-100 bg-slate-50/60">
             <td colspan="{{ months_list|length|add:1 }}"
-                class="freeze-col sticky left-0 bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-smoke">
+                class="freeze-col sticky left-0 top-[43px] z-[15] bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-smoke">
               Custódias de investimento
             </td>
           </tr>
@@ -228,7 +254,7 @@
           <label class="block text-xs font-semibold text-smoke">Tipo</label>
           <select name="type" id="nc-type"
                   class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve"
-                  onchange="toggleCreditFields('nc-credit-fields', this.value)">
+                  onchange="toggleCreditFields('nc-credit-fields', this.value); updateTypeHint(this.value)">
             {% for value, label in account_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
           </select>
         </div>
@@ -238,6 +264,7 @@
                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
         </div>
       </div>
+      <p id="nc-type-hint" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-smoke"></p>
       <div id="nc-credit-fields" class="hidden grid grid-cols-3 gap-3">
         <div>
           <label class="block text-xs font-semibold text-smoke">Limite (R$)</label>
@@ -362,6 +389,7 @@
   display: flex; align-items: center; justify-content: center;
   height: 36px; border-radius: 6px; padding: 0 6px;
   font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   transition: background .12s;
 }
 .cell-display:not(.cell-empty):hover { background: rgba(0,201,122,0.08); }
@@ -535,6 +563,26 @@
   window.toggleCreditFields = function (id, type) {
     document.getElementById(id).classList.toggle('hidden', type !== 'credit');
   };
+
+  const TYPE_HINTS = {
+    checking:   'Conta corrente do dia a dia. O saldo mensal alimenta a projeção de fluxo de caixa.',
+    savings:    'Poupança ou reserva de emergência. Funciona como conta corrente na projeção.',
+    wallet:     'Dinheiro em espécie ou carteira digital (ex: PicPay, Mercado Pago).',
+    credit:     '💳 Cartão de crédito. O Solve monitora o batimento da fatura e sugere o pagamento automaticamente na Projeção.',
+    investment: '📈 Custódia de investimentos (corretora, banco). Liga seu portfólio ao patrimônio total na Projeção e no Diagnóstico.',
+  };
+  window.updateTypeHint = function (type) {
+    const el = document.getElementById('nc-type-hint');
+    if (!el) return;
+    const hint = TYPE_HINTS[type] || '';
+    el.textContent = hint;
+    el.style.display = hint ? '' : 'none';
+  };
+  // Init on page load
+  (function () {
+    const sel = document.getElementById('nc-type');
+    if (sel) updateTypeHint(sel.value);
+  })();
 
   window.openEditConta = function (id, name, type, bank, color, includeInTotal, isActive, creditLimit, closingDay, dueDay) {
     const form = document.getElementById('edit-conta-form');

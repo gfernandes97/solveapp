@@ -556,9 +556,9 @@ function solTour() {
         isDone: (s) => s.hasAccounts,
         askMore: true,
         msgFn: (done) => done
-          ? `Ótimo! Você já tem contas cadastradas. Isso é o ponto de partida de tudo. 🏦<br><br>Você tem mais contas para adicionar?`
-          : `O primeiro passo é criar suas <strong>contas</strong>. Banco, carteira, cartão ou custódia — quanto mais completo, mais preciso fica o diagnóstico.<br><br>👉 Clique em <strong>Nova conta</strong>.`,
-        msgFnMore: () => `Ótimo! Adicione suas outras contas quando quiser.<br><br>👉 Clique em <strong>Nova conta</strong>. Quando terminar, clique em <strong>Já terminei</strong>.`,
+          ? `Ótimo! Você já tem contas cadastradas. Isso é o ponto de partida de tudo. 🏦<br><br>Lembre-se: <strong>cartões de crédito</strong> e <strong>custódias de investimento</strong> também ficam aqui — quanto mais completo, mais preciso o diagnóstico.<br><br>Tem mais contas para adicionar?`
+          : `O primeiro passo é criar suas <strong>contas</strong>. Cadastre <em>todas</em> as que você usa:<br><br>🏦 <strong>Conta corrente / poupança</strong> — saldo mensal e fluxo de caixa<br>💳 <strong>Cartão de crédito</strong> — o Solve monitora a fatura na Projeção<br>📈 <strong>Custódia de investimento</strong> — patrimônio completo no Diagnóstico<br><br>👉 Clique em <strong>Nova conta</strong>.`,
+        msgFnMore: () => `Ótimo! Lembre-se de adicionar também <strong>cartões de crédito</strong> e <strong>custódias de investimento</strong> se ainda não cadastrou.<br><br>👉 Clique em <strong>Nova conta</strong>. Quando terminar, clique em <strong>Já terminei</strong>.`,
         targetFn: (path, done) => {
           if (done) return null;
           return path.startsWith('/dashboard/contas') ? '[data-tour-action="nova-conta"]' : '[data-tour="contas"]';
@@ -908,7 +908,10 @@ function solTour() {
         localStorage.setItem('solve_tour_step', this.step);
       }
       if (solFirstLogin) {
-        // Primeiro login do usuário — abre a Sol e marca como exibida no servidor
+        // Primeiro login do usuário — abre a Sol, salva step 0 e marca como exibida no servidor.
+        // Salvar o step garante que após a primeira navegação (ex: clicar em Visão Geral)
+        // a Sol reabrirá automaticamente na próxima página.
+        localStorage.setItem('solve_tour_step', '0');
         setTimeout(function () {
           self.active = true;
           self.$nextTick(function () { self.updateSpotlight(); });
@@ -918,8 +921,15 @@ function solTour() {
           headers: { 'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '' },
         });
       } else if (!localStorage.getItem('solve_tour_v1')) {
-        // Não é primeiro login mas localStorage foi apagado — não reabre automaticamente
-        // O usuário pode abrir clicando no FAB
+        // Tour em andamento (v1 não concluído). Se há um step salvo, a Sol estava guiando
+        // o usuário e uma navegação de página ocorreu — reabre automaticamente para continuar.
+        if (savedStep !== null) {
+          setTimeout(function () {
+            self.active = true;
+            self.$nextTick(function () { self.updateSpotlight(); });
+          }, 800);
+        }
+        // Se savedStep é null: localStorage foi limpo ou nunca iniciado — não reabre.
       }
     },
 
@@ -1007,7 +1017,7 @@ function solTour() {
       this._clearActionWatch();
       this._clearModalAutoNext();
       localStorage.removeItem('solve_tour_v1');
-      localStorage.removeItem('solve_tour_step');
+      localStorage.setItem('solve_tour_step', '0'); // salva step 0 para reabrir após navegação
       this.step             = 0;
       this.actionClicked    = false;
       this.askingMore       = null;
