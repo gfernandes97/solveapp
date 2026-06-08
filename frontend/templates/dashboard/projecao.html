@@ -731,9 +731,22 @@ document.getElementById('modal-ajuste').addEventListener('click', function(e) {
   if (e.target === this) closeAjusteModal();
 });
 
+const CREDIT_CLOSING_DAYS = {{ credit_closing_days_json|safe }};
+
 function openPagarFaturaModal(amount, dateStr, creditAccId) {
+  // Use the card's closing_day as the payment date day, if configured.
+  let paymentDate = dateStr;
+  const closingDay = CREDIT_CLOSING_DAYS[String(creditAccId)];
+  if (closingDay) {
+    const parts = dateStr.split('-');          // ['YYYY', 'MM', 'DD']
+    const year  = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const day = Math.min(closingDay, daysInMonth);
+    paymentDate = `${parts[0]}-${parts[1]}-${String(day).padStart(2, '0')}`;
+  }
   document.getElementById('fatura-amount').value = amount;
-  document.getElementById('fatura-date').value = dateStr;
+  document.getElementById('fatura-date').value = paymentDate;
   document.getElementById('fatura-to-account').value = creditAccId;
   document.getElementById('fatura-description').value = 'Pagamento de fatura';
   document.getElementById('modal-pagar-fatura').classList.remove('hidden');

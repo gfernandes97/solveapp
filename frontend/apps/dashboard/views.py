@@ -80,16 +80,21 @@ def _own_account(user, pk):
     return get_object_or_404(Account, pk=pk, user=user)
 
 
-def _inv_total_from_txs(user):
-    """Return current total investment value derived from InvestmentTransaction history.
+def _inv_total_from_txs(user, as_of=None):
+    """Return total investment value derived from InvestmentTransaction history.
 
     Matches the calculation in the investimentos view: sum of (buy - sell + earnings)
     per investment, excluding positions where the net is <= 0 (fully exited).
     Never reads Investment.current_price or Investment.quantity directly, preventing
     stale model-field values from inflating the displayed patrimônio.
+
+    Pass as_of to compute the value as it stood at a specific date (inclusive).
     """
+    qs = InvestmentTransaction.objects.filter(user=user)
+    if as_of is not None:
+        qs = qs.filter(date__lte=as_of)
     rows = (
-        InvestmentTransaction.objects.filter(user=user)
+        qs
         .values("investment_id")
         .annotate(
             buy_total=Sum("amount", filter=Q(type=InvestmentTransaction.TYPE_BUY)),
@@ -630,8 +635,11 @@ def diagnostico(request):
     n_months_in_period = len(period_months)
 
     # ── Common data ───────────────────────────────────────────────────────────
-    cash_balance = _projected_cash_balance(request.user, now.date())
-    inv_value    = _inv_total_from_txs(request.user)
+    # For past periods, show patrimônio as of the end of the selected period.
+    # For current/future periods, cap at today so we never project forward.
+    patrimonio_ref = min(date_to - timedelta(days=1), now.date())
+    cash_balance = _projected_cash_balance(request.user, patrimonio_ref)
+    inv_value    = _inv_total_from_txs(request.user, as_of=patrimonio_ref)
     patrimonio   = cash_balance + inv_value
 
     period_txs = Transaction.objects.filter(
@@ -1240,16 +1248,49 @@ def lancamentos(request):
     elif tab == "saidas":
         txs = txs.filter(type=Transaction.TYPE_DEBIT)
 
-    income = Transaction.objects.filter(
+    var_inc_amt = Transaction.objects.filter(
         account__user=request.user,
         date__gte=date_from, date__lt=date_to,
         type=Transaction.TYPE_CREDIT, is_transfer=False, is_investment=False,
     ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    expense = Transaction.objects.filter(
+    var_exp_amt = Transaction.objects.filter(
         account__user=request.user,
         date__gte=date_from, date__lt=date_to,
         type=Transaction.TYPE_DEBIT, is_transfer=False, is_investment=False,
     ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+
+    # Build the list of months covered by the selected period so we can sum fixos correctly.
+    _pm = date_from
+    _period_months = []
+    while _pm < date_to:
+        _period_months.append(_pm)
+        _pm = _add_months(_pm, 1)
+
+    # Fixos active in any part of the selected period — used for summary card totals.
+    # Values-only query (no select_related needed) to sum amounts across all period months.
+    _fixos_period_amounts = list(
+        RecurringTransaction.objects.filter(
+            user=request.user,
+            is_active=True,
+            start_date__lt=date_to,
+        ).filter(Q(end_date__isnull=True) | Q(end_date__gte=date_from))
+        .only("type", "amount", "frequency", "start_date", "end_date", "day_of_week")
+    )
+    fixos_inc_period = sum(
+        _amount_for_month(r, m)
+        for r in _fixos_period_amounts
+        if r.type == RecurringTransaction.TYPE_INCOME
+        for m in _period_months
+    )
+    fixos_exp_period = sum(
+        _amount_for_month(r, m)
+        for r in _fixos_period_amounts
+        if r.type == RecurringTransaction.TYPE_EXPENSE
+        for m in _period_months
+    )
+
+    income = var_inc_amt + fixos_inc_period
+    expense = var_exp_amt + fixos_exp_period
 
     if is_mes:
         month_start = date_from
@@ -2658,11 +2699,13 @@ def projecao(request):
 
     # Pre-fetch credit card account IDs so the loops below can treat them differently
     # (no snapshot anchor — every month is fair game for batimento).
-    _credit_acc_ids: set = set(
+    _credit_accs_data = list(
         Account.objects.filter(
             user=request.user, is_active=True, type=Account.TYPE_CREDIT
-        ).values_list("pk", flat=True)
+        ).values("pk", "due_day")
     )
+    _credit_acc_ids: set = {a["pk"] for a in _credit_accs_data}
+    _credit_closing_days: dict = {a["pk"]: a["due_day"] for a in _credit_accs_data if a["due_day"]}
 
     # Per-account net transactions — custody + credit card accounts.
     # Credit cards have no snapshots so they are handled without an anchor guard.
@@ -3011,18 +3054,22 @@ def projecao(request):
                     "is_credit": False,
                 })
 
-        # Credit card batimento: balance is always 0, so net transactions must also be 0.
-        # Only check months where the card has actual transactions.
+        # Credit card batimento: balance is always 0 — every month with transactions
+        # is checked from scratch (no snapshot anchor). Net is computed directly from
+        # tx_by_acc_month (actual transactions only). Recurring transactions are NOT
+        # included: they can mask real discrepancies (a recurring payment offsets actual
+        # purchases → net = 0 → no warning even in the first month) and would
+        # double-count recurring charges already present as actual Transaction records.
         for _cid in _credit_acc_ids:
             _c_txs = tx_by_acc_month.get((_cid, mo), [])
             if not _c_txs:
                 continue
             checked_any = True
-            _c_net = acc_month_net.get((_cid, mo), Decimal("0"))
-            for _r in recurring_by_acc.get(_cid, []):
-                _ramt = _amount_for_month(_r, mo)
-                _c_net += _ramt if _r.type == RecurringTransaction.TYPE_INCOME else -_ramt
-            # diff = expected_balance - (prev_balance + net) = 0 - (0 + net) = -net
+            _c_net = sum(
+                (t.amount if t.type == Transaction.TYPE_CREDIT else -t.amount)
+                for t in _c_txs
+            )
+            # diff = expected_balance − (prev_balance + net) = 0 − (0 + net) = −net
             _c_diff = -_c_net
             if abs(_c_diff) >= Decimal("0.01"):
                 batimento_issues.append({
@@ -3308,6 +3355,7 @@ def projecao(request):
         "warnings_count": warnings_count,
         "inv_by_acc_json": json.dumps(_inv_by_acc_modal),
         "all_investments_json": json.dumps(_all_investments_modal),
+        "credit_closing_days_json": json.dumps(_credit_closing_days),
         "snap_missing": snap_missing,
         "cash_accounts": cash_accounts,
         "categories": categories,
