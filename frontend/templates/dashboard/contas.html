@@ -111,7 +111,7 @@
             </td>
             {% for mo_str, mo_lbl in months_list %}
             <td class="matrix-cell px-1 py-1 text-center align-middle"
-                data-account="{{ acc.pk }}" data-month="{{ mo_str }}"{% if acc.snap_count < 2 and forloop.last %} data-tour-action="registrar-saldo"{% endif %}>
+                data-account="{{ acc.pk }}" data-month="{{ mo_str }}">
             </td>
             {% endfor %}
           </tr>
@@ -535,11 +535,14 @@
         td.dataset.snapId  = data.snap_id;
         display.textContent = fmtBRL(data.balance);
         display.classList.remove('cell-empty');
+        MATRIX[td.dataset.account] = MATRIX[td.dataset.account] || {};
+        MATRIX[td.dataset.account][td.dataset.month] = { b: parseFloat(data.balance), id: data.snap_id };
       } else if (data.deleted) {
         delete td.dataset.balance;
         delete td.dataset.snapId;
         display.textContent = '—';
         display.classList.add('cell-empty');
+        if (MATRIX[td.dataset.account]) delete MATRIX[td.dataset.account][td.dataset.month];
       } else {
         td.classList.add('cell-error');
         td.classList.remove('cell-saving');
@@ -549,12 +552,37 @@
       display.style.display   = '';
       inputWrap.style.display = 'none';
       td.classList.remove('cell-error');
+      if (typeof window.solMarkNextSnapshot === 'function') window.solMarkNextSnapshot();
     } catch (e) {
       td.classList.add('cell-error');
       input.focus();
     }
     td.classList.remove('cell-saving');
   }
+
+  // ── Sol tour: marca a próxima célula vazia a preencher ───────────────────────
+  // Exposta globalmente com closure sobre MATRIX e CREDIT_IDS.
+  // Ordena do mês mais recente para o mais antigo; dentro do mesmo mês, ordem do DOM.
+  window.solMarkNextSnapshot = function () {
+    document.querySelectorAll('.matrix-cell[data-tour-action="registrar-saldo"]')
+      .forEach(function (el) { el.removeAttribute('data-tour-action'); });
+
+    var cells = Array.from(
+      document.querySelectorAll('.matrix-cell[data-account][data-month]')
+    ).filter(function (td) {
+      if (CREDIT_IDS.has(Number(td.dataset.account))) return false;
+      return !(MATRIX[td.dataset.account] || {})[td.dataset.month];
+    });
+
+    if (!cells.length) return null;
+
+    cells.sort(function (a, b) {
+      return b.dataset.month.localeCompare(a.dataset.month);
+    });
+
+    cells[0].setAttribute('data-tour-action', 'registrar-saldo');
+    return cells[0];
+  };
 
   // ── Utils ────────────────────────────────────────────────────────────────────
   window.openModal  = id => document.getElementById(id).classList.remove('hidden');

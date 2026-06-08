@@ -603,7 +603,9 @@ function solTour() {
           : `Registre o <strong>saldo patrimonial</strong> de <strong>cada conta em pelo menos 2 meses</strong> diferentes.<br><br>💡 Use o mês atual e um anterior que você conheça — isso permite ao Solve calcular a <strong>variação do patrimônio</strong> ao longo do tempo. Use as <strong>mesmas datas</strong> em todas as contas.<br><br>👉 Clique em <strong>Atualizar patrimônio</strong> em cada conta.`,
         targetFn: (path, done) => {
           if (done) return null;
-          return path.startsWith('/dashboard/contas') ? '[data-tour-action="registrar-saldo"]' : '[data-tour="contas"]';
+          if (!path.startsWith('/dashboard/contas')) return '[data-tour="contas"]';
+          if (typeof window.solMarkNextSnapshot === 'function') window.solMarkNextSnapshot();
+          return '[data-tour-action="registrar-saldo"]';
         },
         rewardFn: (done) => done
           ? `Saldo registrado! Hábito que vale pontos todo mês em 📸 Saldo Registrado.`
