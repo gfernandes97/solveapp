@@ -701,7 +701,7 @@ function openAjusteModal(type, amount, year, month, label, accountId) {
   const lastDay = new Date(year, month, 0).getDate();
   const mm = String(month).padStart(2, '0');
   const dd = String(lastDay).padStart(2, '0');
-  document.getElementById('ajuste-date').value = `${year}-${mm}-${dd}`;
+  setDateValue('ajuste-date', `${year}-${mm}-${dd}`);
   document.getElementById('ajuste-description').value = `Ajuste de batimento – ${label}`;
 
   // Pre-select the specific account that caused the discrepancy
@@ -746,7 +746,7 @@ function openPagarFaturaModal(amount, dateStr, creditAccId) {
     paymentDate = `${parts[0]}-${parts[1]}-${String(day).padStart(2, '0')}`;
   }
   document.getElementById('fatura-amount').value = amount;
-  document.getElementById('fatura-date').value = paymentDate;
+  setDateValue('fatura-date', paymentDate);
   document.getElementById('fatura-to-account').value = creditAccId;
   document.getElementById('fatura-description').value = 'Pagamento de fatura';
   document.getElementById('modal-pagar-fatura').classList.remove('hidden');

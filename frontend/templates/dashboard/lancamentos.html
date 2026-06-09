@@ -1118,8 +1118,8 @@ function openEditFixo(pk, name, amount, type, frequency, startDate, accountPk, d
   document.getElementById('edit-fixo-amount').value = amount;
   document.getElementById('edit-fixo-type').value = type;
   document.getElementById('edit-fixo-frequency').value = frequency;
-  document.getElementById('edit-fixo-start').value = startDate;
-  document.getElementById('edit-fixo-end').value = endDate || '';
+  setDateValue('edit-fixo-start', startDate);
+  setDateValue('edit-fixo-end', endDate || '');
   document.getElementById('edit-fixo-account').value = accountPk || '';
   const goalSel = document.getElementById('edit-fixo-goal');
   if (goalSel) goalSel.value = goalPk || '';
@@ -1175,7 +1175,7 @@ function openEditTx(pk, description, amount, dateVal, type, accountPk, categoryP
   document.getElementById('form-editar-tx').action = '/dashboard/lancamentos/' + pk + '/editar/';
   document.getElementById('edit-tx-description').value = description;
   document.getElementById('edit-tx-amount').value = amount;
-  document.getElementById('edit-tx-date').value = dateVal;
+  setDateValue('edit-tx-date', dateVal);
   const accSel = document.getElementById('edit-tx-account');
   if (accountPk) accSel.value = accountPk;
   const catSel = document.getElementById('edit-tx-category');

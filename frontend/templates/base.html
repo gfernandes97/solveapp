@@ -6,6 +6,9 @@
   <title>{% block title %}Solve{% endblock %} | Solve — Agora você sabe.</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -47,6 +50,31 @@
       </button>
     </div>
   </div>
+
+  <script>
+    /* Flatpickr: converte todos os <input type="date"> para exibição dd/mm/yyyy.
+       O input original (hidden) continua com YYYY-MM-DD para o backend.
+       setDateValue() deve ser usado em vez de .value= para inputs com Flatpickr. */
+    document.addEventListener('DOMContentLoaded', function () {
+      flatpickr("input[type='date']", {
+        dateFormat:   "Y-m-d",
+        altInput:     true,
+        altFormat:    "d/m/Y",
+        allowInput:   true,
+        locale:       "pt",
+      });
+    });
+
+    function setDateValue(id, val) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (el._flatpickr) {
+        el._flatpickr.setDate(val || '', false);
+      } else {
+        el.value = val || '';
+      }
+    }
+  </script>
 
   <script>
     (function () {

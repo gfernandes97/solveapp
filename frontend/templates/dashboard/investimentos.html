@@ -696,7 +696,7 @@ function openEditBoleta(pk, type, mode, date, amount, qty, unitPrice, accountPk,
   var typeLabels = {buy:'Compra', sell:'Venda', earnings:'Rendimento', dividends:'Dividendo'};
   document.getElementById('form-editar-boleta').action = '/dashboard/investimentos/boleta/' + pk + '/editar/';
   document.getElementById('edit-boleta-subtitle').textContent = invName + ' · ' + (typeLabels[type] || type);
-  document.getElementById('edit-boleta-date').value = date;
+  setDateValue('edit-boleta-date', date);
   document.getElementById('edit-boleta-account').value = accountPk || '';
   document.getElementById('edit-boleta-notes').value = notes || '';
 

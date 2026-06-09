@@ -81,7 +81,7 @@
           {% if g.provisioned_pct > g.executed_pct %}
           <div>
             <div class="mb-1 flex items-center justify-between">
-              <span class="text-xs font-semibold text-smoke">Previsto</span>
+              <span class="text-xs font-semibold text-smoke">Provisionado</span>
               <span class="text-xs font-semibold tabular-nums text-smoke">{{ g.provisioned_pct }}%</span>
             </div>
             <div class="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
@@ -384,7 +384,7 @@ function openEditMeta(pk, name, description, target, deadline, color) {
   document.getElementById('edit-meta-name').value = name;
   document.getElementById('edit-meta-description').value = description;
   document.getElementById('edit-meta-target').value = target;
-  document.getElementById('edit-meta-deadline').value = deadline || '';
+  setDateValue('edit-meta-deadline', deadline || '');
   document.getElementById('edit-meta-color').value = color;
   document.getElementById('modal-editar-meta').classList.remove('hidden');
 }

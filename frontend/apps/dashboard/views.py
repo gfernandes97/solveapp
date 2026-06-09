@@ -1428,17 +1428,30 @@ def lancamento_editar(request, pk):
     tx_date = _dt(request.POST.get("date")) or tx.date
     category_pk = _iv(request.POST.get("category"))
     goal_pk = _iv(request.POST.get("goal"))
+    new_account_pk = _iv(request.POST.get("account"))
 
     if description:
-        acc = tx.account
-        if old_type == Transaction.TYPE_CREDIT:
-            acc.balance -= old_amount
+        old_acc = tx.account
+
+        # Determine target account (may have changed)
+        if new_account_pk and new_account_pk != old_acc.pk:
+            try:
+                new_acc = Account.objects.get(pk=new_account_pk, user=request.user)
+            except Account.DoesNotExist:
+                new_acc = old_acc
         else:
-            acc.balance += old_amount
+            new_acc = old_acc
+
+        # Reverse the old transaction from the old account
+        if old_type == Transaction.TYPE_CREDIT:
+            old_acc.balance -= old_amount
+        else:
+            old_acc.balance += old_amount
 
         tx.description = description
         tx.amount = amount
         tx.date = tx_date
+        tx.account = new_acc
         tx.category = Category.objects.get(pk=category_pk) if category_pk else tx.category
 
         new_goal = None
@@ -1465,11 +1478,18 @@ def lancamento_editar(request, pk):
         tx.goal = new_goal
         tx.save()
 
+        # Apply new amount to target account (may differ from old_acc)
         if tx.type == Transaction.TYPE_CREDIT:
-            acc.balance += amount
+            new_acc.balance += amount
         else:
-            acc.balance -= amount
-        acc.save(update_fields=["balance"])
+            new_acc.balance -= amount
+
+        if new_acc.pk == old_acc.pk:
+            old_acc.save(update_fields=["balance"])
+        else:
+            old_acc.save(update_fields=["balance"])
+            new_acc.save(update_fields=["balance"])
+
         ach.check_achievements(request.user, request)
 
     return redirect("lancamentos")
