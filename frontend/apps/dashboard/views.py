@@ -1121,7 +1121,7 @@ def lancamentos(request):
 
         goal_pk = _iv(request.POST.get("goal"))
 
-        if description and amount > 0 and account_pk:
+        if description and amount != 0 and account_pk:
             try:
                 acc = Account.objects.get(pk=account_pk, user=request.user)
                 category = None
@@ -1375,7 +1375,7 @@ def lancamento_editar(request, pk):
         new_date   = _dt(request.POST.get("date")) or tx.date
         new_desc   = request.POST.get("description", "").strip() or tx.description
 
-        if new_amount > 0:
+        if new_amount != 0:
             acc = tx.account
 
             # Reverse old balance then apply new
@@ -1691,11 +1691,39 @@ def categoria_criar(request):
     return redirect("/dashboard/lancamentos/?tab=categorias")
 
 
+def _own_category(user, pk):
+    """Retorna a categoria se pertencer ao usuário ou for uma padrão do sistema (user=None)."""
+    cat = get_object_or_404(Category, pk=pk)
+    if cat.user is not None and cat.user != user:
+        from django.http import Http404
+        raise Http404
+    return cat
+
+
+@login_required
+@require_POST
+def categoria_editar(request, pk):
+    cat = _own_category(request.user, pk)
+    name = request.POST.get("name", "").strip()
+    if name:
+        cat.name = name
+        cat.save(update_fields=["name"])
+    return redirect("/dashboard/lancamentos/?tab=categorias")
+
+
 @login_required
 @require_POST
 def categoria_excluir(request, pk):
-    cat = get_object_or_404(Category, pk=pk, user=request.user)
-    cat.delete()
+    cat = _own_category(request.user, pk)
+    has_tx  = Transaction.objects.filter(category=cat).exists()
+    has_rec = RecurringTransaction.objects.filter(category=cat).exists()
+    if has_tx or has_rec:
+        messages.error(
+            request,
+            f"A categoria \"{cat.name}\" possui lançamentos vinculados e não pode ser excluída.",
+        )
+    else:
+        cat.delete()
     return redirect("/dashboard/lancamentos/?tab=categorias")
 
 
@@ -1745,15 +1773,17 @@ def contas(request):
 
     snap_months = {s.month.replace(day=1) for s in all_snaps}
 
-    # Last 12 months always visible
+    # Colunas começam 6 meses antes do primeiro saldo registrado.
+    # Se ainda não há saldo informado, 6 meses antes de hoje.
     today = _now_br().date().replace(day=1)
-    recent: set = set()
-    m = today
-    for _ in range(12):
-        recent.add(m)
-        m = date(m.year - 1, 12, 1) if m.month == 1 else date(m.year, m.month - 1, 1)
+    start = _add_months(min(snap_months), -6) if snap_months else _add_months(today, -6)
+    end   = max(max(snap_months), today) if snap_months else today
 
-    months = sorted(snap_months | recent)  # oldest → newest (left → right)
+    months = []
+    m = start
+    while m <= end:
+        months.append(m)
+        m = _add_months(m, 1)
 
     # {account_id: {month_str: {balance, snap_id}}}
     matrix: dict = {a.pk: {} for a in all_accounts}
@@ -3054,33 +3084,49 @@ def projecao(request):
                     "is_credit": False,
                 })
 
-        # Credit card batimento: balance is always 0 — every month with transactions
-        # is checked from scratch (no snapshot anchor). Net is computed directly from
-        # tx_by_acc_month (actual transactions only). Recurring transactions are NOT
-        # included: they can mask real discrepancies (a recurring payment offsets actual
-        # purchases → net = 0 → no warning even in the first month) and would
-        # double-count recurring charges already present as actual Transaction records.
-        for _cid in _credit_acc_ids:
-            _c_txs = tx_by_acc_month.get((_cid, mo), [])
-            if not _c_txs:
-                continue
-            checked_any = True
-            _c_net = sum(
-                (t.amount if t.type == Transaction.TYPE_CREDIT else -t.amount)
-                for t in _c_txs
-            )
-            # diff = expected_balance − (prev_balance + net) = 0 − (0 + net) = −net
-            _c_diff = -_c_net
-            if abs(_c_diff) >= Decimal("0.01"):
-                batimento_issues.append({
-                    "account_id": _cid,
-                    "account_name": per_acc_names.get(_cid, f"Cartão {_cid}"),
-                    "batimento_diff": _c_diff,
-                    "batimento_abs": abs(_c_diff),
-                    "batimento_abs_str": str(abs(_c_diff)),
-                    "account_investments": [],
-                    "is_credit": True,
-                })
+        # Credit card batimento: only past months — bill already closed.
+        # Current and future months are still open, so no warning is raised.
+        if mo < current_month:
+            for _cid in _credit_acc_ids:
+                _c_txs = tx_by_acc_month.get((_cid, mo), [])
+
+                # Total recurring expenses expected on this card this month
+                _total_rec_exp = sum(
+                    _amount_for_month(_r, mo)
+                    for _r in recurring_by_acc.get(_cid, [])
+                    if _r.type == RecurringTransaction.TYPE_EXPENSE
+                )
+
+                if not _c_txs and not _total_rec_exp:
+                    continue
+                checked_any = True
+
+                # Actual transactions: variable purchases, transfers, executed recurring
+                _c_net = sum(
+                    (t.amount if t.type == Transaction.TYPE_CREDIT else -t.amount)
+                    for t in _c_txs
+                )
+
+                # Avoid double-counting: subtract recurring expenses already present as
+                # is_recurring=True debit transactions before adding the recurring total.
+                _executed_rec_exp = sum(
+                    t.amount for t in _c_txs
+                    if t.is_recurring and t.type == Transaction.TYPE_DEBIT
+                )
+                _c_net -= max(Decimal("0"), _total_rec_exp - _executed_rec_exp)
+
+                # diff = expected_balance − (prev_balance + net) = 0 − (0 + net) = −net
+                _c_diff = -_c_net
+                if abs(_c_diff) >= Decimal("0.01"):
+                    batimento_issues.append({
+                        "account_id": _cid,
+                        "account_name": per_acc_names.get(_cid, f"Cartão {_cid}"),
+                        "batimento_diff": _c_diff,
+                        "batimento_abs": abs(_c_diff),
+                        "batimento_abs_str": str(abs(_c_diff)),
+                        "account_investments": [],
+                        "is_credit": True,
+                    })
 
         if batimento_issues:
             batimento_ok = False

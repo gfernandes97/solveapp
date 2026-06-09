@@ -309,14 +309,18 @@
                   <p class="text-sm font-medium text-obsidian">{{ cat.name }}</p>
                   {% if cat.is_default %}<span class="text-xs text-smoke/80 bg-slate-100 px-1.5 py-0.5 rounded">Padrão</span>{% endif %}
                 </div>
-                {% if cat.user %}
-                <form method="post" action="{% url 'categoria_excluir' cat.pk %}" onsubmit="return confirm('Excluir categoria?')" class="inline">
-                  {% csrf_token %}
-                  <button type="submit" class="flex h-6 w-6 items-center justify-center rounded text-smoke hover:bg-red-50 hover:text-red-500 transition-colors">
-                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <div class="flex items-center gap-1">
+                  <button onclick="openEditarCategoria({{ cat.pk }}, '{{ cat.name|escapejs }}')"
+                          class="flex h-6 w-6 items-center justify-center rounded text-smoke hover:bg-slate-100 hover:text-obsidian transition-colors">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </button>
-                </form>
-                {% endif %}
+                  <form method="post" action="{% url 'categoria_excluir' cat.pk %}" onsubmit="return confirm('Excluir categoria?')" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="flex h-6 w-6 items-center justify-center rounded text-smoke hover:bg-red-50 hover:text-red-500 transition-colors">
+                      <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                  </form>
+                </div>
               </div>
               {% endif %}{% endfor %}
             </div>
@@ -338,14 +342,18 @@
                   <p class="text-sm font-medium text-obsidian">{{ cat.name }}</p>
                   {% if cat.is_default %}<span class="text-xs text-smoke/80 bg-slate-100 px-1.5 py-0.5 rounded">Padrão</span>{% endif %}
                 </div>
-                {% if cat.user %}
-                <form method="post" action="{% url 'categoria_excluir' cat.pk %}" onsubmit="return confirm('Excluir categoria?')" class="inline">
-                  {% csrf_token %}
-                  <button type="submit" class="flex h-6 w-6 items-center justify-center rounded text-smoke hover:bg-red-50 hover:text-red-500 transition-colors">
-                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <div class="flex items-center gap-1">
+                  <button onclick="openEditarCategoria({{ cat.pk }}, '{{ cat.name|escapejs }}')"
+                          class="flex h-6 w-6 items-center justify-center rounded text-smoke hover:bg-slate-100 hover:text-obsidian transition-colors">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </button>
-                </form>
-                {% endif %}
+                  <form method="post" action="{% url 'categoria_excluir' cat.pk %}" onsubmit="return confirm('Excluir categoria?')" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="flex h-6 w-6 items-center justify-center rounded text-smoke hover:bg-red-50 hover:text-red-500 transition-colors">
+                      <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                  </form>
+                </div>
               </div>
               {% endif %}{% endfor %}
             </div>
@@ -501,7 +509,7 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-semibold text-smoke">Valor (R$)</label>
-          <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0,00" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <input type="number" name="amount" step="0.01" required placeholder="0,00" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
         </div>
         <div>
           <label class="block text-xs font-semibold text-smoke">Data</label>
@@ -570,7 +578,7 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-semibold text-smoke">Valor (R$)</label>
-          <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0,00" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <input type="number" name="amount" step="0.01" required placeholder="0,00" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
         </div>
         <div>
           <label class="block text-xs font-semibold text-smoke">Data</label>
@@ -856,7 +864,7 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-semibold text-smoke">Valor (R$)</label>
-          <input type="number" id="edit-tx-amount" name="amount" step="0.01" min="0.01" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+          <input type="number" id="edit-tx-amount" name="amount" step="0.01" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
         </div>
         <div>
           <label class="block text-xs font-semibold text-smoke">Data</label>
@@ -1019,7 +1027,40 @@
   </div>
 </div>
 
+<!-- ─── Modal: Editar Categoria ─── -->
+<div id="modal-editar-categoria" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="font-black text-obsidian">Renomear categoria</h2>
+      <button onclick="document.getElementById('modal-editar-categoria').classList.add('hidden')" class="text-smoke hover:text-obsidian">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="form-editar-categoria" method="post" action="" class="mt-5 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-smoke">Nome</label>
+        <input id="editar-categoria-nome" type="text" name="name" required
+               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian placeholder-smoke/50 focus:border-solve focus:outline-none focus:ring-1 focus:ring-solve">
+      </div>
+      <button type="submit" class="w-full rounded-lg bg-obsidian py-3 text-sm font-black text-white transition-colors hover:bg-obsidian/90">
+        Salvar
+      </button>
+    </form>
+  </div>
+</div>
+
 <script>
+function openEditarCategoria(pk, currentName) {
+  var form = document.getElementById('form-editar-categoria');
+  form.action = '/dashboard/categorias/' + pk + '/editar/';
+  var input = document.getElementById('editar-categoria-nome');
+  input.value = currentName;
+  document.getElementById('modal-editar-categoria').classList.remove('hidden');
+  input.focus();
+  input.select();
+}
+
 /* Filtra as opções de categoria pelo tipo (income/expense) */
 function filterCatSelect(selectId, type) {
   var sel = document.getElementById(selectId);
