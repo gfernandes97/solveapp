@@ -50,6 +50,7 @@ urlpatterns = [
 
     # Categorias
     path("categorias/criar/", views.categoria_criar, name="categoria_criar"),
+    path("categorias/<int:pk>/editar/", views.categoria_editar, name="categoria_editar"),
     path("categorias/<int:pk>/excluir/", views.categoria_excluir, name="categoria_excluir"),
 
     # Configurações
