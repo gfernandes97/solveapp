@@ -3201,12 +3201,14 @@ def projecao(request):
         for (_dk, _dm) in tx_by_acc_month:
             if _dm == mo:
                 _drill_aids.add(_dk)
-        # Include recurring-only accounts strictly after their first snapshot month
+        # Include accounts that have recurring transactions this month.
+        # Skip only when a first snapshot EXISTS and the month is at or before it
+        # (account hadn't started yet). Accounts without snapshots are always eligible.
         for _a, _recs in recurring_by_acc.items():
             if _a is None:
                 continue
             _first = acc_first_snap.get(_a)
-            if _first is None or mo <= _first:
+            if _first is not None and mo <= _first:
                 continue
             if any(_amount_for_month(_r, mo) for _r in _recs):
                 _drill_aids.add(_a)
