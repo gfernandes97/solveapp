@@ -444,9 +444,9 @@ const _INV_QTY    = {{ inv_qty_json|safe }};
       <!-- Conta (obrigatória para compra/venda, opcional para rendimento) -->
       <div>
         <label class="block text-xs font-semibold text-smoke">
-          Conta<span x-show="btype !== 'earnings' && btype !== 'dividends'"> de custódia</span><span x-show="btype === 'earnings'" class="font-normal text-smoke/70"> (opcional)</span>
+          Conta<span x-show="btype !== 'earnings' && btype !== 'dividends'"> de custódia</span><span x-show="btype === 'earnings' || btype === 'dividends'" class="font-normal text-smoke/70"> (opcional)</span>
         </label>
-        <select name="account" x-model="acc" :required="btype !== 'earnings'"
+        <select name="account" x-model="acc" :required="btype !== 'earnings' && btype !== 'dividends'"
                 class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-obsidian focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal">
           <option value="">Selecione…</option>
           {% for acc in boleta_accounts %}

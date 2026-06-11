@@ -663,9 +663,27 @@ def diagnostico(request):
     fixos_exp_total = sum(_period_fixo_amt(r) for r in fixos_exp_list)
     fixos_inc_total = sum(_period_fixo_amt(r) for r in fixos_inc_list)
 
-    # Monthly-equivalent totals for "Fixas" header badges
-    fixos_exp_monthly_total = sum(r.monthly_amount for r in fixos_exp_list)
-    fixos_inc_monthly_total = sum(r.monthly_amount for r in fixos_inc_list)
+    # Monthly-equivalent totals for "Fixas" header badges.
+    # Each recurring is weighted by the fraction of the selected period it was active:
+    #   weighted_monthly = monthly_amount × (active_months_in_period / total_months_in_period)
+    # This ensures a semi-annual that started 2 months ago in a 6-month period only
+    # contributes 2/6 of its monthly rate, rather than the full theoretical rate.
+    def _weighted_monthly_total(fixos_list):
+        if not n_months_in_period:
+            return Decimal("0")
+        total = Decimal("0")
+        for r in fixos_list:
+            n_active = sum(
+                1 for m in period_months
+                if r.start_date.replace(day=1) <= m
+                and (r.end_date is None or r.end_date.replace(day=1) >= m)
+            )
+            if n_active:
+                total += r.monthly_amount * Decimal(n_active) / Decimal(n_months_in_period)
+        return total
+
+    fixos_exp_monthly_total = _weighted_monthly_total(fixos_exp_list)
+    fixos_inc_monthly_total = _weighted_monthly_total(fixos_inc_list)
     fixos_exp_approx = any(r.frequency != RecurringTransaction.FREQ_MONTHLY for r in fixos_exp_list)
     fixos_inc_approx = any(r.frequency != RecurringTransaction.FREQ_MONTHLY for r in fixos_inc_list)
 
@@ -682,9 +700,13 @@ def diagnostico(request):
     ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
     inv_income_amt = earn_amt + div_amt
 
+    # Investment earnings/dividends are classified as variable income so that
+    # Fixo + Variável always adds up to the displayed Receitas total.
+    var_inc_amt  += inv_income_amt
+
     fixed_inc_amt = fixos_inc_total
     fixed_exp_amt = fixos_exp_total
-    income        = var_inc_amt + fixos_inc_total + inv_income_amt
+    income        = var_inc_amt + fixos_inc_total
     expense       = var_exp_amt + fixos_exp_total
     month_balance = income - expense
 
@@ -2228,6 +2250,9 @@ def investimento_boleta(request):
     def _success_redirect():
         if _redirect_to == "projecao":
             return redirect("projecao")
+        # Redirect to the month of the registered transaction so the boleta is immediately visible
+        if tx_date:
+            return redirect(f"/dashboard/investimentos/?period=mes&ano={tx_date.year}&mes={tx_date.month}")
         return redirect("investimentos")
 
     boleta_type = request.POST.get("boleta_type", InvestmentTransaction.TYPE_BUY)
